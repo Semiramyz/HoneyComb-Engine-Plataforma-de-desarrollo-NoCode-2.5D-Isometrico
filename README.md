@@ -46,17 +46,68 @@ Para la ejecución de scripts o aplicaciones en JavaScript/TypeScript, se requie
 1. Descarga e instala la versión recomendada (LTS) de Node.js desde su [sitio web oficial](https://nodejs.org/).
 2. El gestor de paquetes **npm** se instalará automáticamente junto con Node.js.
 
+# Guía del Entorno de Desarrollo
+
+Documento técnico para la preparación y configuración del entorno de desarrollo. Este proyecto utiliza una arquitectura separada que combina un **Editor de Mapas/Niveles** basado en tecnologías web/escritorio y un **Motor de Ejecución (Runtime)** nativo de alto rendimiento.
+
 ---
 
-## 3. Verificación de la Instalación
+## 0. Resumen de Cambios en la Arquitectura
 
-Cierra todas las terminales abiertas y abre una nueva ventana de la Línea de comandos (`cmd`), PowerShell o la terminal integrada de **Visual Studio Code**. Verifica las herramientas ejecutando:
+Se ha actualizado el stack tecnológico del proyecto para unificar el flujo de trabajo dentro de **Visual Studio Code**:
 
+| Componente | Configuración Anterior | Configuración Actual |
+| :--- | :--- | :--- |
+| **IDE Principal** | Visual Studio | **VS Code** |
+| **Framework Frontend (Editor)** | React | **Angular** |
+| **Plataforma de Escritorio** | Electron | **Electron** |
+| **Motor / Runtime** | C++ / raylib | **C++ / raylib** *(Sin cambios)* |
+
+> **Nota:** El Runtime en C++/raylib mantiene su arquitectura, pero ahora se compila, ejecuta y depura directamente desde VS Code mediante herramientas de CMake.
+
+---
+
+## 1. Requisitos Base del Sistema
+
+Instala estas herramientas base en tu sistema operativo antes de configurar las extensiones o el código fuente:
+
+| Herramienta | Propósito | Verificación |
+| :--- | :--- | :--- |
+| **Git** | Control de versiones | `git --version` |
+| **Node.js (LTS v20+)** | Runtime para Angular y Electron (incluye `npm`) | `node -v` && `npm -v` |
+| **CMake (3.20+)** | Sistema de construcción (*build system*) para C++ | `cmake --version` |
+| **Compilador C++** | Compilación nativa del Motor (MSVC, GCC o Clang) | Depende del SO |
+| **vcpkg** *(Recomendado)* | Gestor de paquetes C++ para librerías (`raylib`, `nlohmann-json`) | `./vcpkg version` |
+
+---
+
+## 2. Configuración del IDE: VS Code
+
+Descarga e instala [Visual Studio Code](https://code.visualstudio.com/). A continuación, instala las siguientes extensiones requeridas según su área funcional:
+
+### 2.1 Extensiones para C++ / Runtime
+* **C/C++** (`ms-vscode.cpptools`): Navegación, IntelliSense y depuración.
+* **CMake Tools** (`ms-vscode.cmake-tools`): Configuración, compilación y ejecución de proyectos CMake.
+* **CMake Language Support** (`twxs.cmake`): Resaltado de sintaxis para archivos `CMakeLists.txt`.
+* *(Opcional)* **CodeLLDB** (`vadimcn.vscode-lldb`): Depurador alternativo para entornos Linux/macOS.
+
+### 2.2 Extensiones para Angular / Electron
+* **Angular Language Service** (`Angular.ng-template`): Autocompletado y validación dentro de plantillas `.html`.
+* **ESLint** (`dbaeumer.vscode-eslint`): Linter para TypeScript y JavaScript.
+* **Prettier - Code Formatter** (`esbenp.prettier-vscode`): Formateo automático y consistente de código.
+* **JavaScript Debugger** (`ms-vscode.js-debug`): Incluido por defecto para depuración de procesos Node/Electron.
+
+### 2.3 Extensiones Transversales
+* **GitLens** (`eamodio.gitlens`): Historial de cambios y atribución de líneas (*git blame*).
+* **Live Share** (`ms-vsliveshare.vsliveshare`): Colaboración e inspección de código en tiempo real.
+* **Error Lens** (`usernamehw.errorlens`): Diagnóstico visual de advertencias y errores en línea.
+* *(Opcional)* **Todo Tree**: Seguimiento de anotaciones `TODO` y `FIXME` en la base de código.
+
+---
+
+## 3. Stack del Editor (`/editor`): Angular + Electron
+
+### 3.1 Instalación de Herramientas Globales
 ```bash
-# Verificación de compiladores C/C++
-gcc --version
-g++ --version
-
-# Verificación de Node.js y npm
-node -v
-npm -v
+npm install -g @angular/cli
+ng version # Verificación
