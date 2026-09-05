@@ -1,0 +1,6 @@
+{
+  "name": "nivel_de_prueba",
+  "grid": { "width": 10, "height": 10 },
+  "entities": [],
+  "events": []
+}

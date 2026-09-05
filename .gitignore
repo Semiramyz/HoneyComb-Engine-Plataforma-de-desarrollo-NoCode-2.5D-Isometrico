@@ -1,0 +1,18 @@
+# Engine (CMake / vcpkg build artifacts)
+engine/build/
+engine/out/
+*.obj
+*.o
+*.exe
+*.dll
+*.pdb
+
+# Editor (Angular / Electron)
+editor/node_modules/
+editor/dist/
+editor/.angular/
+
+# IDE / OS
+.vs/
+.DS_Store
+Thumbs.db
