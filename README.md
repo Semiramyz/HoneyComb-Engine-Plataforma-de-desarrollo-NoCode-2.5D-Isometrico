@@ -3,7 +3,7 @@
 
 ---
 
-## Descripción del proyecto
+## Descripción del proyecto!
 
 **HoneyComb Engine** es un prototipo de plataforma de desarrollo **NoCode** orientada a la creación de experiencias interactivas isométricas 2.5D de puzle y acción. El proyecto combina:
 
