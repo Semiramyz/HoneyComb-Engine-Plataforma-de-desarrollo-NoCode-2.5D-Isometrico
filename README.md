@@ -252,27 +252,45 @@ Se necesita un `main.js` (proceso principal de Electron) que cargue el build de 
 - **Jasmine + Karma** (incluidos por defecto con `ng new`) para pruebas unitarias de componentes.
 - **Playwright** para pruebas end-to-end sobre la app Electron ya empaquetada.
 
+### 6.6 Capa de lógica del editor (previa a los componentes visuales)
+
+Antes de construir canvas/paneles, el editor tiene una capa de lógica sin UI, espejo del mismo contrato de datos que usa el runtime C++:
+
+- **`main.js` / `preload.js`** — API de proyecto vía `contextBridge`: `openFolder()` (elige la carpeta raíz del proyecto), `readFile`/`writeFile`/`listDir` (rutas siempre relativas a esa raíz; el proceso principal valida que no escapen de la carpeta del proyecto antes de tocar el disco).
+- **`src/app/models/`** — interfaces TypeScript espejo de `level.schema.json` y `event_catalog.json` (`level.model.ts`, `event-catalog.model.ts`). Cualquier campo nuevo se agrega primero al schema, y acá y en `LevelLoader.cpp` en simultáneo.
+- **`src/app/core/iso-projection.ts`** — espejo exacto en TypeScript de `IsoGridSystem::GridToScreen`/`ScreenToGrid` (C++), para que el canvas ubique las entidades en pantalla de la misma forma que el runtime.
+- **`src/app/services/`**:
+  - `ProjectService` — único punto de contacto con la API de Electron; el resto del editor nunca llama `window.honeycombProject` directamente.
+  - `CatalogService` — carga `event_catalog.json` una vez y lo deja disponible para consulta (qué triggers/condiciones/acciones existen, con qué parámetros).
+  - `LevelService` — mantiene el nivel abierto en memoria (signals de Angular) y expone las operaciones para modificarlo (agregar/actualizar/quitar entidades y eventos); ningún componente visual muta el objeto `Level` directamente.
+
+El panel de eventos que se construya sobre `CatalogService` debe generar sus formularios **dinámicamente** a partir de los `params` de cada entrada del catálogo (no un formulario fijo por tipo) — es el equivalente en el editor del patrón de registro que usa `EventSystem` en C++: agregar un bloque nuevo al catálogo no debería requerir tocar código Angular.
+
 ---
 
 ## 7. Estructura de Carpetas del Proyecto
 
 ```
 /honeycomb-engine
-├── editor/                       # Angular + Electron
-│   ├── src/
-│   │   ├── canvas/                 # Render isométrico del editor (preview)
-│   │   ├── panels/                 # Propiedades, capas, assets
-│   │   └── events/                  # UI del editor de eventos
-│   ├── main.js                      # Proceso principal de Electron
-│   └── preload.js                   # Puente seguro renderer ↔ sistema de archivos
-├── engine/                        # C++17 / raylib
-│   ├── core/                        # Wrapper de abstracción sobre raylib
+├── editor/                        # Angular + Electron
+│   ├── src/app/
+│   │   ├── models/                  # Espejo TS de level.schema.json / event_catalog.json
+│   │   ├── core/                    # iso-projection.ts (espejo de IsoGridSystem)
+│   │   ├── services/                # ProjectService, CatalogService, LevelService
+│   │   └── electron-api.d.ts        # Tipos de la API que expone preload.js
+│   ├── main.js                      # Proceso principal de Electron (API de proyecto)
+│   └── preload.js                   # Puente seguro renderer <-> sistema de archivos
+├── engine/                        # C++17 / raylib (backend SDL2)
+│   ├── core/                        # GraphicsDevice, ResourceManager (wrapper sobre raylib)
 │   ├── systems/
-│   │   ├── iso_grid/
-│   │   ├── z_sort/
-│   │   ├── collision/
-│   │   └── event_system/
-│   ├── loader/                      # LevelLoader, EventLoader
+│   │   ├── iso_grid/                 # IsoGridSystem
+│   │   ├── z_sort/                   # ZSortSystem
+│   │   ├── collision/                # CollisionSystem
+│   │   ├── event_system/             # EventSystem
+│   │   ├── animation/                # AnimationSystem
+│   │   ├── audio/                    # AudioSystem
+│   │   └── input/                    # InputSystem
+│   ├── loader/                      # LevelLoader, EventLoader, AssetResolver
 │   ├── vcpkg.json                    # Manifiesto de dependencias (sdl2, nlohmann-json; raylib se compila vía FetchContent)
 │   ├── CMakePresets.json             # Toolchain de vcpkg vía $env{VCPKG_ROOT} (portable entre máquinas)
 │   ├── CMakeLists.txt
@@ -283,6 +301,8 @@ Se necesita un `main.js` (proceso principal de Electron) que cargue el build de 
 ├── tools/
 │   └── profiling/                    # Scripts de evaluación de rendimiento
 ├── assets/
+│   ├── textures/
+│   └── sounds/
 └── levels/
 ```
 

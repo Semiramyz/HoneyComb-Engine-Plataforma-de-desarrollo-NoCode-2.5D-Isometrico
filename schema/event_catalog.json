@@ -1,5 +1,32 @@
 {
-  "triggers": [],
+  "triggers": [
+    {
+      "type": "on_collision",
+      "label": "Al colisionar",
+      "description": "Se dispara cuando dos entidades se solapan (CollisionSystem).",
+      "params": {
+        "entityA": { "type": "entity_ref", "description": "Primera entidad involucrada" },
+        "entityB": { "type": "entity_ref", "description": "Segunda entidad involucrada" }
+      }
+    }
+  ],
   "conditions": [],
-  "actions": []
+  "actions": [
+    {
+      "type": "play_sound",
+      "label": "Reproducir sonido",
+      "description": "Reproduce un archivo de audio una vez.",
+      "params": {
+        "soundPath": { "type": "string", "description": "Ruta al archivo de sonido" }
+      }
+    },
+    {
+      "type": "destroy_entity",
+      "label": "Destruir entidad",
+      "description": "Elimina una entidad del nivel.",
+      "params": {
+        "entity": { "type": "entity_ref", "description": "Entidad a destruir" }
+      }
+    }
+  ]
 }

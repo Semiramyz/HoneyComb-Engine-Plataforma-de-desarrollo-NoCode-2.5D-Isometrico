@@ -1,6 +1,35 @@
 {
   "name": "prueba_final",
-  "grid": { "width": 10, "height": 10 },
-  "entities": [],
-  "events": []
+  "grid": { "width": 10, "height": 10, "tileWidth": 64, "tileHeight": 32 },
+  "entities": [
+    {
+      "id": "player_1",
+      "type": "player",
+      "position": { "col": 2, "row": 2 },
+      "texture": "textures/player.png",
+      "sourceRect": { "x": 0, "y": 0, "width": 16, "height": 16 },
+      "animation": "player_idle",
+      "collider": { "width": 16, "height": 16 }
+    },
+    {
+      "id": "wall_1",
+      "type": "obstacle",
+      "position": { "col": 4, "row": 2 },
+      "texture": "textures/player.png",
+      "sourceRect": { "x": 0, "y": 0, "width": 16, "height": 16 },
+      "collider": { "width": 16, "height": 16 }
+    }
+  ],
+  "events": [
+    {
+      "trigger": {
+        "type": "on_collision",
+        "params": { "entityA": "player_1", "entityB": "wall_1" }
+      },
+      "actions": [
+        { "type": "destroy_entity", "params": { "entity": "wall_1" } },
+        { "type": "play_sound", "params": { "soundPath": "sounds/hit.wav" } }
+      ]
+    }
+  ]
 }

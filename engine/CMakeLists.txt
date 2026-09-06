@@ -22,8 +22,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(raylib)
 
-add_executable(engine main.cpp)
+add_executable(engine main.cpp core/GraphicsDevice.cpp core/ResourceManager.cpp
+    systems/iso_grid/IsoGridSystem.cpp systems/z_sort/ZSortSystem.cpp
+    systems/collision/CollisionSystem.cpp systems/event_system/EventSystem.cpp
+    systems/animation/AnimationSystem.cpp systems/audio/AudioSystem.cpp
+    systems/input/InputSystem.cpp loader/AssetResolver.cpp loader/EventLoader.cpp
+    loader/LevelLoader.cpp)
 target_link_libraries(engine PRIVATE raylib SDL2::SDL2 nlohmann_json::nlohmann_json)
+target_include_directories(engine PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(TARGET SDL2::SDL2)
     add_custom_command(TARGET engine POST_BUILD

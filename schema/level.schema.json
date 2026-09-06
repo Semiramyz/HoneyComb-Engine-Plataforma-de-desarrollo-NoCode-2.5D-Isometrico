@@ -7,13 +7,91 @@
     "name": { "type": "string" },
     "grid": {
       "type": "object",
-      "required": ["width", "height"],
+      "required": ["width", "height", "tileWidth", "tileHeight"],
       "properties": {
         "width": { "type": "integer", "minimum": 1 },
-        "height": { "type": "integer", "minimum": 1 }
+        "height": { "type": "integer", "minimum": 1 },
+        "tileWidth": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 64,
+          "description": "Ancho del tile isometrico en pixeles. Configurable por proyecto/nivel desde el editor; 64 sigue la proporcion estandar 2:1 de pixel art isometrico (tileWidth = 2 * tileHeight)."
+        },
+        "tileHeight": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 32,
+          "description": "Alto del tile isometrico en pixeles. Ver tileWidth."
+        }
       }
     },
-    "entities": { "type": "array" },
-    "events": { "type": "array" }
+    "entities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "position", "texture", "sourceRect"],
+        "properties": {
+          "id": { "type": "string", "description": "Identificador unico dentro del nivel, referenciado por eventos (entity_ref)." },
+          "type": { "type": "string", "description": "Tipo/categoria de la entidad (ej. player, obstaculo, item). Libre, uso del editor." },
+          "position": {
+            "type": "object",
+            "required": ["col", "row"],
+            "properties": {
+              "col": { "type": "integer" },
+              "row": { "type": "integer" }
+            }
+          },
+          "texture": { "type": "string", "description": "Ruta relativa a assets/ (ver AssetResolver)." },
+          "sourceRect": {
+            "type": "object",
+            "required": ["x", "y", "width", "height"],
+            "properties": {
+              "x": { "type": "number" },
+              "y": { "type": "number" },
+              "width": { "type": "number" },
+              "height": { "type": "number" }
+            }
+          },
+          "animation": { "type": "string", "description": "Nombre de clip registrado en AnimationSystem. Opcional." },
+          "collider": {
+            "type": "object",
+            "description": "Opcional; ausente si la entidad no colisiona.",
+            "properties": {
+              "width": { "type": "number" },
+              "height": { "type": "number" }
+            }
+          }
+        }
+      }
+    },
+    "events": {
+      "type": "array",
+      "description": "Eventos condicion-accion configurados desde el editor. 'type' en cada paso referencia un ID de schema/event_catalog.json.",
+      "items": {
+        "type": "object",
+        "required": ["trigger", "actions"],
+        "properties": {
+          "trigger": { "$ref": "#/definitions/eventStep" },
+          "conditions": {
+            "type": "array",
+            "items": { "$ref": "#/definitions/eventStep" }
+          },
+          "actions": {
+            "type": "array",
+            "items": { "$ref": "#/definitions/eventStep" }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "eventStep": {
+      "type": "object",
+      "required": ["type", "params"],
+      "properties": {
+        "type": { "type": "string" },
+        "params": { "type": "object" }
+      }
+    }
   }
 }
