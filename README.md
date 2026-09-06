@@ -42,7 +42,7 @@ Instala estas herramientas en tu sistema operativo antes de proceder con el ento
 | **CMake (3.20+)** | Sistema de construcción (*build system*) para el Motor | `cmake --version` |
 | **Ninja** (recomendado) | Generador de build más rápido que el predeterminado | `ninja --version` |
 | **Compilador C++17** | MinGW-w64, MSVC, GCC o Clang, según SO (ver sección 2) | Ver verificación específica por opción |
-| **vcpkg** | Gestor de paquetes C++ (`raylib`, `nlohmann-json`) | `./vcpkg version` |
+| **vcpkg** | Gestor de paquetes C++ (`sdl2`, `nlohmann-json`) | `./vcpkg version` |
 
 > **Nota:** la verificación del compilador difiere según la ruta que elijas en la sección 2 — no todos los compiladores se verifican con el mismo comando.
 
@@ -114,38 +114,21 @@ cd vcpkg
 
 ⚠️ **Importante:** el *triplet* de vcpkg debe coincidir con el compilador elegido en la sección 2, o el linkeo del motor fallará por incompatibilidad de ABI.
 
-- Si usas **MinGW-w64 (Opción A recomendada)**:
-  ```bash
-  ./vcpkg install raylib nlohmann-json --triplet x64-mingw-dynamic
-  ```
-- Si usas **MSVC**:
-  ```bash
-  ./vcpkg install raylib nlohmann-json --triplet x64-windows
-  ```
-- Si usas **Linux/macOS**, el triplet por defecto (`x64-linux` / `x64-osx` / `arm64-osx`) es correcto sin flags adicionales:
-  ```bash
-  ./vcpkg install raylib nlohmann-json
-  ```
+El proyecto trabaja en **modo manifiesto**: con el `vcpkg.json` de `/engine` presente, no hace falta correr `vcpkg install` a mano — CMake lo dispara automáticamente al configurar (sección 5), instalando lo que declara el manifiesto (`sdl2` y `nlohmann-json`; ver 3.3 sobre por qué `raylib` no está ahí). Aun así, el triplet debe coincidir con el compilador elegido:
 
-Para no repetir el flag `--triplet` en cada comando, puedes fijarlo como variable de entorno:
-```bash
-export VCPKG_DEFAULT_TRIPLET=x64-mingw-dynamic   # ajusta según tu caso
-```
+- **MinGW-w64 (Opción A recomendada):** triplet `x64-mingw-dynamic`.
+- **MSVC:** triplet `x64-windows`.
+- **Linux/macOS:** el triplet por defecto (`x64-linux` / `x64-osx` / `arm64-osx`) es correcto sin configuración adicional.
 
-### 3.3 Fijar la versión de raylib
+El triplet se fija en `/engine/CMakePresets.json` (ver sección 5.2), no como variable de entorno ni flag manual.
 
-Todo el diseño de arquitectura de este proyecto parte específicamente del diagrama **raylib 6.0**. Para evitar compilar contra una versión distinta sin darte cuenta, fija la versión en el manifiesto de vcpkg (`vcpkg.json` dentro de `/engine`):
-```json
-{
-  "name": "honeycomb-engine",
-  "version": "0.1.0",
-  "dependencies": [
-    { "name": "raylib", "version>=": "6.0" },
-    "nlohmann-json"
-  ]
-}
-```
-Con un `vcpkg.json` presente, vcpkg trabaja en **modo manifiesto**: instala automáticamente las versiones correctas al configurar el proyecto con CMake, sin necesidad de correr `vcpkg install` manualmente cada vez.
+### 3.3 raylib se compila desde el código fuente (no vía vcpkg) — backend SDL2
+
+Todo el diseño de arquitectura de este proyecto parte específicamente del diagrama **raylib 6.0**, pero **raylib no aparece en `vcpkg.json`**: se descarga y compila automáticamente desde el código fuente oficial mediante `FetchContent` en `engine/CMakeLists.txt`, fijado al tag `6.0`.
+
+¿Por qué no usar el paquete precompilado de vcpkg? Por defecto, raylib usa **GLFW** para crear la ventana. En pruebas de desarrollo se encontró que, en ciertas combinaciones de driver NVIDIA + Windows, GLFW cuelga la ventana al arrancar (confirmado con depurador: el hilo principal queda bloqueado dentro de la propia DLL del driver). Cambiar raylib al backend **SDL2** evita ese problema por completo, y como el paquete de vcpkg para raylib solo ofrece GLFW, la solución es compilar raylib nosotros mismos con `-DPLATFORM=SDL`. `sdl2` sí es una dependencia declarada en `vcpkg.json`, y CMake la instala igual que `nlohmann-json`, en modo manifiesto.
+
+Como este proceso está completamente declarado en `engine/CMakeLists.txt` y `engine/vcpkg.json` (ambos versionados), no requiere ningún paso manual adicional: `CMake: Configure` descarga SDL2 vía vcpkg y clona/compila raylib vía `FetchContent` automáticamente.
 
 ---
 
@@ -185,11 +168,32 @@ project(honeycomb_engine CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(raylib CONFIG REQUIRED)
+find_package(SDL2 CONFIG REQUIRED)
 find_package(nlohmann_json CONFIG REQUIRED)
 
+# raylib se compila desde el codigo fuente (no via vcpkg) para usar el backend
+# de ventanas SDL2 en vez de GLFW (ver seccion 3.3 del README).
+set(PLATFORM "SDL" CACHE STRING "" FORCE)
+set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+
+include(FetchContent)
+FetchContent_Declare(
+    raylib
+    GIT_REPOSITORY https://github.com/raysan5/raylib.git
+    GIT_TAG 6.0
+    GIT_SHALLOW TRUE
+)
+FetchContent_MakeAvailable(raylib)
+
 add_executable(engine main.cpp)
-target_link_libraries(engine PRIVATE raylib nlohmann_json::nlohmann_json)
+target_link_libraries(engine PRIVATE raylib SDL2::SDL2 nlohmann_json::nlohmann_json)
+
+if(TARGET SDL2::SDL2)
+    add_custom_command(TARGET engine POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "$<TARGET_FILE:SDL2::SDL2>" "$<TARGET_FILE_DIR:engine>"
+    )
+endif()
 ```
 
 ### 5.2 Conectar VS Code con el toolchain de vcpkg
@@ -269,7 +273,8 @@ Se necesita un `main.js` (proceso principal de Electron) que cargue el build de 
 │   │   ├── collision/
 │   │   └── event_system/
 │   ├── loader/                      # LevelLoader, EventLoader
-│   ├── vcpkg.json                    # Manifiesto de dependencias (raylib 6.0, nlohmann-json)
+│   ├── vcpkg.json                    # Manifiesto de dependencias (sdl2, nlohmann-json; raylib se compila vía FetchContent)
+│   ├── CMakePresets.json             # Toolchain de vcpkg vía $env{VCPKG_ROOT} (portable entre máquinas)
 │   ├── CMakeLists.txt
 │   └── main.cpp
 ├── schema/
@@ -294,9 +299,9 @@ Se necesita un `main.js` (proceso principal de Electron) que cargue el build de 
 7. [ ] Clonar y arrancar **vcpkg** (`bootstrap-vcpkg`).
 8. [ ] Confirmar el **triplet correcto** de vcpkg según el compilador elegido (sección 3.2).
 9. [ ] Clonar el repositorio del proyecto (`honeycomb-engine`).
-10. [ ] Crear/confirmar `vcpkg.json` en `/engine` con `raylib >= 6.0` y `nlohmann-json`.
-11. [ ] Abrir `/engine` en VS Code → configurar `cmake.configureArgs` con la ruta al toolchain de vcpkg (sección 5.2).
-12. [ ] `CMake: Configure` → `CMake: Build` en `/engine`. Confirmar que compila sin errores.
+10. [ ] Confirmar `vcpkg.json` en `/engine` (`sdl2`, `nlohmann-json`) — ya versionado, no requiere cambios.
+11. [ ] Definir la variable de entorno `VCPKG_ROOT` en tu máquina, apuntando a tu clon de vcpkg (sección 5.2). Abrir `/engine` en VS Code — `CMakePresets.json` ya está versionado y CMake Tools lo detecta solo.
+12. [ ] `CMake: Configure` → `CMake: Build` en `/engine`. Confirmar que compila sin errores. La primera vez tarda varios minutos (vcpkg compila SDL2 y CMake clona/compila raylib desde el código fuente); las siguientes son incrementales y rápidas.
 13. [ ] Instalar `@angular/cli` globalmente.
 14. [ ] Dentro de `/editor`: `npm install` (Angular, Electron, electron-builder, @angular/cdk, ajv).
 15. [ ] Levantar el editor en modo desarrollo (`ng serve` + `electron .`) y confirmar que abre la ventana de escritorio.
