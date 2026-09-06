@@ -193,15 +193,13 @@ target_link_libraries(engine PRIVATE raylib nlohmann_json::nlohmann_json)
 ```
 
 ### 5.2 Conectar VS Code con el toolchain de vcpkg
-En `/engine/.vscode/settings.json`:
-```json
-{
-  "cmake.configureArgs": [
-    "-DCMAKE_TOOLCHAIN_FILE=<ruta_a_vcpkg>/scripts/buildsystems/vcpkg.cmake"
-  ]
-}
+El proyecto usa `/engine/CMakePresets.json` (versionado en el repo) para apuntar al toolchain de vcpkg a través de la variable de entorno `VCPKG_ROOT`, en vez de una ruta fija — así cada persona del equipo puede tener vcpkg clonado donde quiera, sin tocar ningún archivo versionado.
+
+Define `VCPKG_ROOT` una sola vez en tu máquina, apuntando a donde clonaste vcpkg en la sección 3:
+```powershell
+[Environment]::SetEnvironmentVariable("VCPKG_ROOT", "C:\ruta\a\tu\vcpkg", "User")
 ```
-Reemplaza `<ruta_a_vcpkg>` por la ruta absoluta donde clonaste vcpkg en la sección 3.
+(cierra y vuelve a abrir la terminal/VS Code para que tome la variable). `CMakePresets.json` ya trae dos presets listos: `default` (MinGW-w64, `x64-mingw-dynamic`) y `msvc` (`x64-windows`) — CMake Tools los detecta automáticamente al abrir `/engine`.
 
 ### 5.3 Flujo de trabajo en VS Code
 1. Abrir la carpeta `/engine` en VS Code.

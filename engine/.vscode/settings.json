@@ -1,5 +1,3 @@
 {
-  "cmake.configureArgs": [
-    "-DCMAKE_TOOLCHAIN_FILE=C:/Users/js020/vcpkg/scripts/buildsystems/vcpkg.cmake"
-  ]
+  "cmake.useCMakePresets": "always"
 }
