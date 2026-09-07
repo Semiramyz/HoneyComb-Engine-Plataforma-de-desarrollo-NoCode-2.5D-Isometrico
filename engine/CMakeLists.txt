@@ -37,3 +37,28 @@ if(TARGET SDL2::SDL2)
             "$<TARGET_FILE:SDL2::SDL2>" "$<TARGET_FILE_DIR:engine>"
     )
 endif()
+
+# Con MinGW el ejecutable queda enlazado a libstdc++/libgcc/libwinpthread, que
+# solo estan en el bin/ del toolchain. Sin esto, engine.exe corre desde una
+# shell de MSYS2 pero falla con "falta un DLL" al abrirlo con doble clic.
+if(MINGW)
+    get_filename_component(_mingw_bin "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    foreach(_dll libstdc++-6.dll libgcc_s_seh-1.dll libwinpthread-1.dll)
+        if(EXISTS "${_mingw_bin}/${_dll}")
+            add_custom_command(TARGET engine POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "${_mingw_bin}/${_dll}" "$<TARGET_FILE_DIR:engine>"
+            )
+        endif()
+    endforeach()
+endif()
+
+# main.cpp abre "levels/..." y AssetResolver usa "assets/" como raiz: ambas
+# rutas son relativas al directorio de trabajo. Copiarlas junto al binario
+# hace que engine.exe funcione sin depender de donde se lo lance.
+foreach(_data assets levels)
+    add_custom_command(TARGET engine POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+            "${CMAKE_CURRENT_SOURCE_DIR}/../${_data}" "$<TARGET_FILE_DIR:engine>/${_data}"
+    )
+endforeach()

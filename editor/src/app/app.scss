@@ -427,6 +427,9 @@
 
   .field {
     flex: 1;
+    /* Sin esto los dos campos no bajan del ancho natural del input y el
+       segundo se sale del dock. */
+    min-width: 0;
 
     > span {
       flex: 0 0 34px;
@@ -646,6 +649,10 @@
   color: var(--text-dim);
   font-size: 11px;
   line-height: 1.5;
+  /* En la paleta de recursos el contenedor es un grid de columnas angostas:
+     sin esto el mensaje cae dentro de una columna de 66px y se parte letra
+     a letra. */
+  grid-column: 1 / -1;
 }
 
 /* ---------- Scrollbars ---------- */
