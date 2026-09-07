@@ -1,0 +1,667 @@
+/* Tema oscuro tipo Godot/GameMaker: docks acoplados, cromo minimo, acento
+   ambar por la identidad HoneyComb. Todo el color vive en estas variables. */
+:host {
+  --bg-deep: #14171d;
+  --bg-panel: #1e222a;
+  --bg-panel-alt: #232833;
+  --bg-head: #272d38;
+  --bg-input: #171b21;
+  --border: #101319;
+  --border-soft: #333a46;
+
+  --text: #c7cdd8;
+  --text-dim: #79818f;
+  --text-bright: #eef1f6;
+
+  --accent: #f5a623;
+  --accent-dim: #7a5312;
+  --danger: #e05a5a;
+  --ok: #5be0a0;
+
+  display: block;
+  height: 100vh;
+  overflow: hidden;
+  color: var(--text);
+  font: 12px/1.45 "Segoe UI", Inter, system-ui, sans-serif;
+  background: var(--bg-deep);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.shell {
+  display: grid;
+  grid-template-rows: 38px 1fr 220px 24px;
+  height: 100%;
+}
+
+/* ---------- Barra superior ---------- */
+.menubar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 10px;
+  background: var(--bg-head);
+  border-bottom: 1px solid var(--border);
+}
+
+.brand {
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  padding-right: 10px;
+  border-right: 1px solid var(--border-soft);
+
+  &__mark {
+    color: var(--accent);
+    font-size: 15px;
+  }
+  &__name {
+    color: var(--text-bright);
+    font-weight: 600;
+    letter-spacing: 0.2px;
+  }
+  &__sub {
+    color: var(--text-dim);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+}
+
+.menubar__group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.menubar__spacer,
+.toolbar__spacer,
+.statusbar__spacer,
+.tabs__spacer,
+.event__spacer {
+  flex: 1;
+}
+
+/* ---------- Cuerpo ---------- */
+.body {
+  display: grid;
+  grid-template-columns: 232px 1fr 272px;
+  min-height: 0;
+}
+
+.dock {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--bg-panel);
+
+  &--left {
+    border-right: 1px solid var(--border);
+  }
+  &--right {
+    border-left: 1px solid var(--border);
+  }
+  &--bottom {
+    border-top: 1px solid var(--border);
+    min-height: 0;
+  }
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-bottom: 1px solid var(--border);
+
+  &--grow {
+    flex: 1;
+  }
+
+  &__head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: var(--bg-head);
+    color: var(--text-bright);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  &__count {
+    padding: 0 5px;
+    border-radius: 8px;
+    background: var(--bg-input);
+    color: var(--text-dim);
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0;
+  }
+
+  &__body {
+    overflow: auto;
+    min-height: 0;
+
+    &--list {
+      padding: 3px 0;
+    }
+    &--tiles {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(66px, 1fr));
+      gap: 5px;
+      padding: 8px;
+      max-height: 190px;
+    }
+    &--form {
+      padding: 8px;
+    }
+  }
+}
+
+/* ---------- Arbol de escena ---------- */
+.tree__item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 4px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--bg-panel-alt);
+  }
+
+  &.is-active {
+    background: var(--accent-dim);
+    color: var(--text-bright);
+  }
+
+  &--root {
+    color: var(--text-bright);
+    font-weight: 600;
+  }
+}
+
+.tree__icon {
+  color: #5b8fd6;
+  font-size: 11px;
+
+  &--player {
+    color: var(--accent);
+  }
+  &--obstacle {
+    color: var(--danger);
+  }
+  &--item {
+    color: var(--ok);
+  }
+}
+
+.tree__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree__meta {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+  font-size: 10px;
+}
+
+/* ---------- Paleta de recursos ---------- */
+.tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 3px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: var(--bg-input);
+  color: var(--text-dim);
+  font: inherit;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--border-soft);
+  }
+  &.is-active {
+    border-color: var(--accent);
+    color: var(--text-bright);
+  }
+
+  &__thumb {
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--border-soft);
+    /* Tablero de ajedrez: el fondo canonico de transparencia en pixel art. */
+    background-image:
+      linear-gradient(45deg, #2b313b 25%, transparent 25%),
+      linear-gradient(-45deg, #2b313b 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #2b313b 75%),
+      linear-gradient(-45deg, transparent 75%, #2b313b 75%);
+    background-size: 8px 8px;
+    background-position: 0 0, 0 4px, 4px -4px, -4px 0;
+    image-rendering: pixelated;
+  }
+
+  &__name {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 9px;
+  }
+}
+
+/* ---------- Viewport ---------- */
+.viewport {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--bg-deep);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  background: var(--bg-head);
+  border-bottom: 1px solid var(--border);
+
+  &__group {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+
+  &__sep {
+    width: 1px;
+    height: 18px;
+    background: var(--border-soft);
+  }
+
+  &__label {
+    color: var(--text-dim);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+  }
+
+  &__hint {
+    color: var(--text-dim);
+    font-size: 10px;
+  }
+}
+
+.tool {
+  min-width: 26px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: var(--bg-input);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--border-soft);
+  }
+  &.is-active {
+    background: var(--accent-dim);
+    border-color: var(--accent);
+    color: var(--text-bright);
+  }
+  &--zoom {
+    font-family: ui-monospace, "Cascadia Mono", monospace;
+    font-size: 10px;
+  }
+  &--wide {
+    padding: 0 9px;
+    font-size: 11px;
+  }
+}
+
+.canvas-host {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  /* Sin suavizado: el pixel art se ve a bordes duros aun al ampliar. */
+  image-rendering: pixelated;
+  cursor: crosshair;
+}
+
+.overlay {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  display: flex;
+  gap: 5px;
+  pointer-events: none;
+
+  &__chip {
+    padding: 2px 7px;
+    border: 1px solid var(--border-soft);
+    border-radius: 3px;
+    background: rgba(20, 23, 29, 0.85);
+    color: var(--text-dim);
+    font-family: ui-monospace, "Cascadia Mono", monospace;
+    font-size: 10px;
+  }
+}
+
+/* ---------- Inspector ---------- */
+.group {
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+
+  &:last-child {
+    border-bottom: 0;
+  }
+
+  &__title {
+    margin-bottom: 6px;
+    color: var(--text-dim);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+  }
+
+  &--actions {
+    display: flex;
+    gap: 6px;
+  }
+}
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+
+  > span {
+    flex: 0 0 58px;
+    color: var(--text-dim);
+    font-size: 11px;
+  }
+
+  &--inline {
+    margin-bottom: 0;
+
+    > span {
+      flex: 0 0 auto;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+  }
+}
+
+.field-row {
+  display: flex;
+  gap: 8px;
+
+  .field {
+    flex: 1;
+
+    > span {
+      flex: 0 0 34px;
+    }
+  }
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 23px;
+  padding: 0 6px;
+  border: 1px solid var(--border-soft);
+  border-radius: 3px;
+  background: var(--bg-input);
+  color: var(--text-bright);
+  font: inherit;
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+  font-size: 11px;
+
+  &:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+
+  input {
+    accent-color: var(--accent);
+  }
+}
+
+.hint {
+  margin: 4px 0 0;
+  color: var(--text-dim);
+  font-size: 10px;
+  line-height: 1.4;
+
+  &--warn {
+    color: #c9a24a;
+  }
+}
+
+/* ---------- Dock inferior / eventos ---------- */
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 8px;
+  background: var(--bg-head);
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--text);
+  }
+  &.is-active {
+    color: var(--text-bright);
+    border-bottom-color: var(--accent);
+  }
+}
+
+.dock__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 8px;
+}
+
+.event {
+  margin-bottom: 8px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  background: var(--bg-panel-alt);
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+
+    &--child {
+      padding-left: 26px;
+      border-top: 1px solid var(--border);
+    }
+  }
+}
+
+.badge {
+  padding: 2px 7px;
+  border-radius: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+
+  &--trigger {
+    background: var(--accent-dim);
+    color: #f7c46c;
+  }
+  &--action {
+    background: #1d3a4d;
+    color: #6fb6df;
+  }
+}
+
+.console {
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+  font-size: 11px;
+
+  &__line {
+    padding: 1px 0;
+    color: var(--text-dim);
+
+    &::before {
+      content: "› ";
+      color: var(--accent);
+    }
+  }
+}
+
+/* ---------- Barra de estado ---------- */
+.statusbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  background: var(--bg-head);
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+
+  &__msg {
+    color: var(--text-dim);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.pill {
+  padding: 1px 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+  background: var(--bg-input);
+  color: var(--text-dim);
+  font-size: 10px;
+  white-space: nowrap;
+
+  &--warn {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+}
+
+/* ---------- Botones ---------- */
+.btn {
+  height: 24px;
+  padding: 0 11px;
+  border: 1px solid var(--border-soft);
+  border-radius: 3px;
+  background: var(--bg-panel-alt);
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+
+  &:hover {
+    background: #2b313c;
+    color: var(--text-bright);
+  }
+
+  &--primary {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+    color: #ffd694;
+
+    &:hover {
+      background: #8d6015;
+    }
+  }
+
+  &--danger:hover {
+    border-color: var(--danger);
+    color: #ff9a9a;
+  }
+
+  &--small {
+    height: 20px;
+    padding: 0 8px;
+    font-size: 10px;
+  }
+}
+
+.empty {
+  margin: 0;
+  padding: 12px 10px;
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* ---------- Scrollbars ---------- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-deep);
+}
+::-webkit-scrollbar-thumb {
+  border: 2px solid var(--bg-deep);
+  border-radius: 5px;
+  background: #3a414e;
+
+  &:hover {
+    background: #4a5261;
+  }
+}
