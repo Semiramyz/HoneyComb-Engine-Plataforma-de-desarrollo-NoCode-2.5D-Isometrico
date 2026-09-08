@@ -1,4 +1,5 @@
 #include <iostream>
+#include <filesystem>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -14,7 +15,12 @@
 #include "systems/input/InputSystem.hpp"
 #include "systems/z_sort/ZSortSystem.hpp"
 
-int main() {
+int main(int argc, char* argv[]) {
+    if (argc > 0) {
+        std::filesystem::current_path(
+            std::filesystem::absolute(argv[0]).parent_path());
+    }
+
     GraphicsDevice gfx(800, 450, "HoneyComb Engine - Runtime");
     ResourceManager resources;
     AssetResolver assets;
