@@ -18,6 +18,7 @@ import { ProjectService } from './services/project.service';
 
 type Tool = 'select' | 'place';
 type CatalogKind = 'triggers' | 'conditions' | 'actions';
+export type NewLevelTemplate = 'empty' | 'player' | 'test-scene';
 
 // Zoom entero unicamente. En pixel art un zoom fraccionario (1.5x) reparte mal
 // los pixeles del sprite -- unos quedan de 1px y otros de 2px -- y arruina la
@@ -27,6 +28,7 @@ const ZOOM_STEPS = [1, 2, 3, 4, 6, 8];
 // Umbral de la matriz de riesgos ("Degradacion de Rendimiento por Usuario"):
 // el editor avisa antes de que la escena comprometa los FPS del runtime.
 const ENTITY_WARN_THRESHOLD = 150;
+const DEFAULT_STARTER_TEXTURE = 'player.png';
 
 interface ParamRow {
   key: string;
@@ -51,6 +53,13 @@ export class App {
   readonly textures = signal<string[]>([]);
   readonly status = signal('Listo. Abri una carpeta de proyecto para empezar.');
   readonly dirty = signal(false);
+  readonly showNewLevelDialog = signal(false);
+  readonly newLevelName = signal('nuevo_nivel');
+  readonly newLevelWidth = signal(10);
+  readonly newLevelHeight = signal(10);
+  readonly newLevelTileWidth = signal(64);
+  readonly newLevelTileHeight = signal(32);
+  readonly newLevelTemplate = signal<NewLevelTemplate>('empty');
 
   readonly tool = signal<Tool>('select');
   readonly activeTexture = signal<string | null>(null);
@@ -148,10 +157,75 @@ export class App {
   }
 
   newLevel(): void {
-    this.levels.createNew('nuevo_nivel');
+    this.newLevelName.set('nuevo_nivel');
+    this.newLevelWidth.set(10);
+    this.newLevelHeight.set(10);
+    this.newLevelTileWidth.set(64);
+    this.newLevelTileHeight.set(32);
+    this.newLevelTemplate.set('empty');
+    this.showNewLevelDialog.set(true);
+  }
+
+  cancelNewLevel(): void {
+    this.showNewLevelDialog.set(false);
+  }
+
+  setNewLevelTemplate(value: string): void {
+    if (value === 'empty' || value === 'player' || value === 'test-scene') {
+      this.newLevelTemplate.set(value);
+    }
+  }
+
+  confirmNewLevel(): void {
+    const name = this.newLevelName().trim() || 'nuevo_nivel';
+    const grid: GridConfig = {
+      width: Math.max(1, Math.round(this.newLevelWidth())),
+      height: Math.max(1, Math.round(this.newLevelHeight())),
+      tileWidth: Math.max(1, Math.round(this.newLevelTileWidth())),
+      tileHeight: Math.max(1, Math.round(this.newLevelTileHeight())),
+    };
+
+    this.levels.createNew(name, grid);
+    this.addStarterEntities(this.newLevelTemplate(), grid);
+    this.showNewLevelDialog.set(false);
     this.dirty.set(true);
     this.pan.set({ x: 0, y: 0 });
-    this.note('Nivel nuevo en memoria. Renombralo en el Inspector y guardalo.');
+    this.note('Nivel nuevo en memoria. Revisa la escena y guardalo.');
+  }
+
+  private addStarterEntities(template: NewLevelTemplate, grid: GridConfig): void {
+    if (template === 'empty') {
+      return;
+    }
+
+    const texture = this.textures()[0] ?? DEFAULT_STARTER_TEXTURE;
+
+    const sourceRect = { x: 0, y: 0, width: 16, height: 16 };
+    this.levels.addEntity({
+      id: 'player_1',
+      type: 'player',
+      position: {
+        col: Math.min(1, grid.width - 1),
+        row: Math.min(2, grid.height - 1),
+      },
+      texture: 'textures/' + texture,
+      sourceRect,
+      collider: { width: 16, height: 16 },
+    });
+
+    if (template === 'test-scene') {
+      this.levels.addEntity({
+        id: 'target_1',
+        type: 'obstacle',
+        position: {
+          col: Math.min(3, grid.width - 1),
+          row: Math.min(2, grid.height - 1),
+        },
+        texture: 'textures/' + texture,
+        sourceRect: { ...sourceRect },
+        collider: { width: 16, height: 16 },
+      });
+    }
   }
 
   async save(): Promise<void> {

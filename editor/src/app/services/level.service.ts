@@ -26,8 +26,8 @@ export class LevelService {
 
   constructor(private readonly project: ProjectService) {}
 
-  createNew(name: string): void {
-    this.level.set(emptyLevel(name));
+  createNew(name: string, grid: GridConfig = DEFAULT_GRID): void {
+    this.level.set({ ...emptyLevel(name), grid: { ...grid } });
     this.fileName.set(null);
     this.selectedEntityId.set(null);
   }

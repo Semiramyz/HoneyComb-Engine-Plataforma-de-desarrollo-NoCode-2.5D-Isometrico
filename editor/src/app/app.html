@@ -39,6 +39,75 @@
     <span class="pill">{{ project.projectRoot() ?? 'Sin proyecto' }}</span>
   </header>
 
+  @if (showNewLevelDialog()) {
+    <div class="modal-backdrop" (click)="cancelNewLevel()">
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="new-level-title"
+               (click)="$event.stopPropagation()">
+        <div class="modal__head">
+          <div>
+            <span class="eyebrow">Inicializar escena</span>
+            <h2 id="new-level-title">Crear nivel</h2>
+          </div>
+          <button class="icon-button" type="button" title="Cerrar" (click)="cancelNewLevel()">×</button>
+        </div>
+
+        <div class="modal__body">
+          <label class="field">
+            <span>Nombre del nivel</span>
+            <input class="input" [value]="newLevelName()" (input)="newLevelName.set(str($event))" autofocus />
+          </label>
+
+          <div class="group__title">Dimensiones de grilla</div>
+          <div class="field-row">
+            <label class="field">
+              <span>Ancho</span>
+              <input class="input" type="number" min="1" step="1" [value]="newLevelWidth()"
+                     (input)="newLevelWidth.set(int($event))" />
+            </label>
+            <label class="field">
+              <span>Alto</span>
+              <input class="input" type="number" min="1" step="1" [value]="newLevelHeight()"
+                     (input)="newLevelHeight.set(int($event))" />
+            </label>
+          </div>
+
+          <div class="field-row">
+            <label class="field">
+              <span>Tile W</span>
+              <input class="input" type="number" min="1" step="1" [value]="newLevelTileWidth()"
+                     (input)="newLevelTileWidth.set(int($event))" />
+            </label>
+            <label class="field">
+              <span>Tile H</span>
+              <input class="input" type="number" min="1" step="1" [value]="newLevelTileHeight()"
+                     (input)="newLevelTileHeight.set(int($event))" />
+            </label>
+          </div>
+
+          <label class="field">
+            <span>Plantilla inicial</span>
+            <select class="input" [value]="newLevelTemplate()"
+                  (change)="setNewLevelTemplate(str($event))">
+              <option value="empty">Grilla vacia</option>
+              <option value="player">Jugador</option>
+              <option value="test-scene">Escena de prueba</option>
+            </select>
+          </label>
+          @if (textures().length === 0) {
+            <p class="hint">Las plantillas usaran textures/player.png. Abre un proyecto antes de guardar el nivel.</p>
+          } @else {
+            <p class="hint">Usara {{ textures()[0] }} como textura inicial. Podras cambiarla desde Recursos.</p>
+          }
+        </div>
+
+        <div class="modal__actions">
+          <button class="btn" type="button" (click)="cancelNewLevel()">Cancelar</button>
+          <button class="btn btn--primary" type="button" (click)="confirmNewLevel()">Crear nivel</button>
+        </div>
+      </section>
+    </div>
+  }
+
   <!-- ===================== CUERPO ===================== -->
   <div class="body">
     <!-- --------- DOCK IZQUIERDO --------- -->
