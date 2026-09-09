@@ -1,0 +1,30 @@
+@startuml runtime-game-loop
+title Runtime - Ciclo principal de simulacion y renderizado
+autonumber
+
+participant "GraphicsDevice" as graphics
+participant "InputSystem" as input
+participant "LevelEntity / mundo" as world
+participant "AnimationSystem" as animation
+participant "CollisionSystem" as collision
+participant "EventSystem" as events
+participant "ZSortSystem" as zsort
+participant "AudioSystem" as audio
+
+loop Mientras la ventana no se cierre
+  graphics -> input : leer acciones del frame
+  input -> world : aplicar movimiento valido
+  graphics -> animation : actualizar clips(deltaTime)
+  graphics -> collision : Submit(colliders)
+  collision --> events : colisiones detectadas
+  graphics -> zsort : Submit(sprites)
+  zsort -> graphics : Flush() en orden Z
+  graphics -> events : Update()
+  events -> world : ejecutar acciones
+  events -> audio : reproducir sonidos si corresponde
+  audio --> graphics : estado de audio actualizado
+  graphics -> graphics : BeginFrame()
+  graphics -> graphics : dibujar texto y frame
+  graphics -> graphics : EndFrame()
+end
+@enduml

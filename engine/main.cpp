@@ -18,9 +18,26 @@
 #include "systems/z_sort/ZSortSystem.hpp"
 
 int main(int argc, char* argv[]) {
+    const std::filesystem::path launchDirectory = std::filesystem::current_path();
+    const std::filesystem::path executableDirectory =
+        std::filesystem::absolute(argv[0]).parent_path();
+
     if (argc > 0) {
-        std::filesystem::current_path(
-            std::filesystem::absolute(argv[0]).parent_path());
+        std::filesystem::current_path(executableDirectory);
+    }
+
+    std::filesystem::path levelPath = "levels/test_level.json";
+    if (argc >= 2) {
+        levelPath = std::filesystem::path(argv[1]);
+        if (levelPath.is_relative()) {
+            const std::filesystem::path launchRelativePath = launchDirectory / levelPath;
+            const std::filesystem::path executableRelativePath = executableDirectory / levelPath;
+            if (std::filesystem::exists(launchRelativePath)) {
+                levelPath = launchRelativePath;
+            } else {
+                levelPath = executableRelativePath;
+            }
+        }
     }
 
     GraphicsDevice gfx(800, 450, "HoneyComb Engine - Runtime");
@@ -29,7 +46,7 @@ int main(int argc, char* argv[]) {
     EventSystem events;
     LevelLoader loader(resources, assets);
 
-    LoadedLevel level = loader.Load("levels/test_level.json", events);
+    LoadedLevel level = loader.Load(levelPath.string(), events);
     std::cout << "Nivel cargado: " << level.name
               << " (" << level.entities.size() << " entidades)" << std::endl;
 

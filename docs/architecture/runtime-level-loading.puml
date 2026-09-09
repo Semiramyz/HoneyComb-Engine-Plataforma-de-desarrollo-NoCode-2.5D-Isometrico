@@ -1,0 +1,32 @@
+@startuml runtime-level-loading
+title Runtime - Carga de nivel
+autonumber
+
+participant "main.cpp" as main
+participant "LevelLoader" as loader
+participant "nlohmann::json" as json
+participant "AssetResolver" as resolver
+participant "ResourceManager" as resources
+participant "EventLoader" as eventLoader
+participant "EventSystem" as events
+database "levels/test_level.json" as levelFile
+database "assets/" as assets
+
+main -> loader : Load(levelPath, eventSystem)
+loader -> levelFile : abrir y leer
+levelFile --> loader : JSON de nivel
+loader -> json : parse y validar estructura
+json --> loader : datos de grid y entidades
+loader -> resolver : Resolve(texturePath)
+resolver -> assets : localizar recurso
+assets --> resolver : ruta absoluta/normalizada
+resolver --> loader : asset path
+loader -> resources : cargar o reutilizar textura
+resources --> loader : Texture2D
+loader -> eventLoader : cargar eventos del nivel
+eventLoader -> json : parse definiciones
+json --> eventLoader : triggers y acciones
+eventLoader -> events : registrar eventos
+loader --> main : LoadedLevel
+main -> events : Update() durante el loop
+@enduml

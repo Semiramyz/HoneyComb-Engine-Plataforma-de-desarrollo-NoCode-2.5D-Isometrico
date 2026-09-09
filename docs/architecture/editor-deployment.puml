@@ -1,0 +1,36 @@
+@startuml editor-deployment
+title Editor - Despliegue y procesos
+left to right direction
+skinparam componentStyle rectangle
+
+node "Equipo del disenador" as workstation {
+  node "Proceso Electron" as electron {
+    component "Main process\nmain.js" as main
+    component "Preload isolated\npreload.js" as preload
+    component "Renderer\nAngular build" as renderer
+  }
+  folder "Carpeta de proyecto" as project
+}
+
+node "Entorno de desarrollo" as dev {
+  component "Angular dev server\nng serve :4200" as ng
+  component "Node.js / npm" as node
+}
+
+node "Runtime distribuido" as runtime {
+  component "engine.exe" as exe
+}
+
+dev --> electron : abre editor instalado
+ng --> renderer : ELECTRON_START_URL
+node --> ng : npm run dev
+main --> preload
+preload --> renderer
+renderer --> project : IPC y filesystem
+project --> exe : levels, schema y assets
+
+note bottom
+Desarrollo: Electron carga Angular desde localhost si esta disponible.
+Distribucion: Electron carga dist/ y electron-builder empaqueta la aplicacion.
+end note
+@enduml

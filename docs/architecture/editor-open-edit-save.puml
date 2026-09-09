@@ -1,0 +1,48 @@
+@startuml editor-open-edit-save
+title Editor - Abrir, editar y guardar un nivel
+autonumber
+
+actor Disenador as designer
+participant "App\nAngular" as app
+participant "LevelService" as level
+participant "ProjectService" as project
+participant "preload.js" as preload
+participant "Electron main" as main
+database "Proyecto en disco" as disk
+
+designer -> app : Abrir proyecto
+app -> project : openProjectFolder()
+project -> preload : openFolder()
+preload -> main : IPC project:openFolder
+main -> disk : seleccionar carpeta
+disk --> main : ruta raiz
+main --> preload : ruta
+preload --> project : ruta
+project --> app : proyecto abierto
+
+app -> project : readLevel(fileName)
+project -> preload : readFile(levels/...)
+preload -> main : IPC project:readFile
+main -> disk : leer JSON
+disk --> main : contenido
+main --> preload : contenido
+preload --> project : contenido
+project --> level : parse Level
+level --> app : estado reactivo actualizado
+
+designer -> app : mover entidad / cambiar evento
+app -> level : updateEntity / updateEvent
+level --> app : signal actualizado
+
+designer -> app : Guardar
+app -> level : save()
+level -> project : saveLevel(fileName, level)
+project -> preload : writeFile(levels/..., JSON)
+preload -> main : IPC project:writeFile
+main -> disk : escribir JSON
+disk --> main : confirmacion
+main --> preload : ok
+preload --> project : ok
+project --> level : guardado
+level --> app : dirty=false
+@enduml

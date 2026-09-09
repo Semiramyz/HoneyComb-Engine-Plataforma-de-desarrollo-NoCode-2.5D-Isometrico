@@ -1,0 +1,49 @@
+@startuml editor-components
+title Editor - Componentes y limites de responsabilidad
+top to bottom direction
+skinparam componentStyle rectangle
+
+package "Proceso Electron renderer" as renderer {
+  component "App\nAngular component" as app
+  component "Canvas isometrico\nrender y entrada" as canvas
+  component "Paneles y formularios" as panels
+  component "LevelService\nestado del nivel" as levelService
+  component "CatalogService\ncatalogo de eventos" as catalogService
+  component "ProjectService\nfachada tipada" as projectService
+  component "IsoProjection\nproyeccion de coordenadas" as projection
+  component "Modelos TypeScript\nLevel / EventCatalog" as models
+}
+
+package "Proceso Electron main" as mainProcess {
+  component "main.js\nventana, dialogos e IPC" as main
+  component "fs/promises\nacceso a archivos" as fs
+}
+
+component "preload.js\ncontextBridge" as preload
+folder "Proyecto en disco" as disk {
+  file "levels/*.json" as levelFiles
+  file "schema/event_catalog.json" as eventFile
+  folder "assets/textures" as textureFiles
+}
+
+app --> canvas
+app --> panels
+app --> levelService
+app --> catalogService
+canvas --> projection
+levelService --> models
+catalogService --> models
+levelService --> projectService
+catalogService --> projectService
+projectService --> preload : honeycombProject API
+preload --> main : ipcRenderer.invoke
+main --> fs
+fs --> disk : rutas relativas validadas
+
+note right of preload
+Boundary de seguridad:
+contextIsolation=true
+nodeIntegration=false
+API minima expuesta al renderer.
+end note
+@enduml
