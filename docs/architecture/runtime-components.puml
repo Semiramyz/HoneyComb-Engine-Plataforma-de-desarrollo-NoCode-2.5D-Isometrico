@@ -1,0 +1,62 @@
+@startuml runtime-components
+title Runtime - Componentes internos
+top to bottom direction
+skinparam componentStyle rectangle
+
+component "main.cpp\norquestacion" as main
+
+package "Core" as core {
+  component "GraphicsDevice\nventana y dibujo" as graphics
+  component "ResourceManager\ncache de recursos" as resources
+}
+
+package "Loaders" as loaders {
+  component "LevelLoader\nJSON -> LoadedLevel" as levelLoader
+  component "EventLoader\nJSON -> eventos" as eventLoader
+  component "AssetResolver\nrutas de assets" as assetResolver
+}
+
+package "Systems" as systems {
+  component "IsoGridSystem\ncoordenadas" as iso
+  component "ZSortSystem\norden de dibujo" as zsort
+  component "CollisionSystem\ncolisiones" as collision
+  component "EventSystem\ntriggers y acciones" as events
+  component "AnimationSystem\nclips e instancias" as animation
+  component "AudioSystem\nsonido" as audio
+  component "InputSystem\nacciones" as input
+}
+
+database "Proyecto en disco" as disk
+component "raylib / SDL2" as raylib
+component "nlohmann::json" as json
+
+main --> graphics
+main --> resources
+main --> levelLoader
+main --> events
+main --> zsort
+main --> collision
+main --> animation
+main --> audio
+main --> input
+levelLoader --> eventLoader
+levelLoader --> assetResolver
+levelLoader --> resources
+levelLoader --> iso
+eventLoader --> events
+assetResolver --> disk
+levelLoader --> disk
+levelLoader --> json
+events --> json
+graphics --> raylib
+resources --> raylib
+zsort --> graphics
+audio --> raylib
+input --> raylib
+
+note right of graphics
+Los sistemas no deben llamar raylib
+directamente para renderizado;
+GraphicsDevice es el facade grafico.
+end note
+@enduml

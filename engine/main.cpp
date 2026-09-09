@@ -1,4 +1,6 @@
 #include <iostream>
+#include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <string>
 #include <unordered_map>
@@ -59,12 +61,16 @@ int main(int argc, char* argv[]) {
     // --- AudioSystem ---
     AudioSystem audio;
 
-    // --- InputSystem: acciones de movimiento en grilla, una celda por vez ---
+    // --- InputSystem: movimiento continuo en coordenadas de grilla ---
     InputSystem input;
     input.BindAction("move_up", KEY_UP);
     input.BindAction("move_down", KEY_DOWN);
     input.BindAction("move_left", KEY_LEFT);
     input.BindAction("move_right", KEY_RIGHT);
+    input.BindAction("move_up_wasd", KEY_W);
+    input.BindAction("move_down_wasd", KEY_S);
+    input.BindAction("move_left_wasd", KEY_A);
+    input.BindAction("move_right_wasd", KEY_D);
 
     // --- EventSystem: registro de trigger/acciones del catalogo minimo ---
     std::vector<CollisionPair> currentCollisions;
@@ -106,20 +112,88 @@ int main(int argc, char* argv[]) {
     LevelEntity* player = entityById.count("player_1") ? entityById["player_1"] : nullptr;
 
     while (!gfx.ShouldClose()) {
-        // --- Movimiento del jugador (una celda por pulsacion, con limites) ---
+        // --- Movimiento continuo con limites y bloqueo contra obstaculos ---
         if (player && !player->destroyed) {
-            GridCoord next = player->position;
-            if (input.IsActionPressed("move_up")) next.row -= 1;
-            else if (input.IsActionPressed("move_down")) next.row += 1;
-            else if (input.IsActionPressed("move_left")) next.col -= 1;
-            else if (input.IsActionPressed("move_right")) next.col += 1;
+            Vector2 screenDirection{0, 0};
+            if (input.IsActionDown("move_up") || input.IsActionDown("move_up_wasd")) screenDirection.y -= 1;
+            if (input.IsActionDown("move_down") || input.IsActionDown("move_down_wasd")) screenDirection.y += 1;
+            if (input.IsActionDown("move_left") || input.IsActionDown("move_left_wasd")) screenDirection.x -= 1;
+            if (input.IsActionDown("move_right") || input.IsActionDown("move_right_wasd")) screenDirection.x += 1;
 
-            if (level.grid.IsValidCoord(next)) {
-                player->position = next;
+            Vector2 direction{
+                screenDirection.x + screenDirection.y,
+                screenDirection.y - screenDirection.x
+            };
+            float directionLength = std::sqrt(direction.x * direction.x + direction.y * direction.y);
+            if (directionLength > 0) {
+                direction.x /= directionLength;
+                direction.y /= directionLength;
+                float movementSpeed = 3.0f;
+                Vector2 candidate = player->precisePosition;
+                candidate.x += direction.x * movementSpeed * gfx.GetDeltaTime();
+                candidate.y += direction.y * movementSpeed * gfx.GetDeltaTime();
+
+                float edgePadding = 0.45f;
+                candidate.x = std::clamp(candidate.x, edgePadding,
+                                         level.grid.GetGridWidth() - 1.0f - edgePadding);
+                candidate.y = std::clamp(candidate.y, edgePadding,
+                                         level.grid.GetGridHeight() - 1.0f - edgePadding);
+
+                bool blocked = false;
+                for (const auto& entity : level.entities) {
+                    if (entity.destroyed || entity.type != "obstacle") {
+                        continue;
+                    }
+                    if (std::fabs(candidate.x - entity.precisePosition.x) < 0.7f &&
+                        std::fabs(candidate.y - entity.precisePosition.y) < 0.7f) {
+                        blocked = true;
+                        break;
+                    }
+                }
+
+                if (!blocked) {
+                    player->precisePosition = candidate;
+                    player->position = GridCoord{
+                        static_cast<int>(std::round(candidate.x)),
+                        static_cast<int>(std::round(candidate.y))
+                    };
+                }
             }
         }
 
         gfx.BeginFrame(RAYWHITE);
+        float levelOriginY = gfx.GetScreenHeight() / 2.0f -
+            (level.grid.GetGridWidth() + level.grid.GetGridHeight() - 2) *
+            level.grid.GetTileHeight() / 4.0f;
+
+        for (int row = 0; row < level.grid.GetGridHeight(); ++row) {
+            for (int col = 0; col < level.grid.GetGridWidth(); ++col) {
+                Vector2 screenPos = level.grid.GridToScreen(GridCoord{col, row});
+                screenPos.x += gfx.GetScreenWidth() / 2.0f;
+                screenPos.y += levelOriginY;
+
+                if (level.floorTexture) {
+                    zsort.Submit(SpriteInstance{
+                        level.floorTexture, level.floorSourceRect,
+                        Vector2{screenPos.x - level.floorSourceRect.width / 2.0f,
+                                screenPos.y - level.floorSourceRect.height / 2.0f},
+                        Vector2{0, 0}, 0.0f, WHITE, 0
+                    });
+                }
+
+                if (level.wallTexture &&
+                    (col == 0 || row == 0 ||
+                     col == level.grid.GetGridWidth() - 1 ||
+                     row == level.grid.GetGridHeight() - 1)) {
+                    zsort.Submit(SpriteInstance{
+                        level.wallTexture, level.wallSourceRect,
+                        Vector2{screenPos.x - level.wallSourceRect.width / 2.0f,
+                                screenPos.y - level.wallSourceRect.height},
+                        Vector2{0, 0}, 0.0f, WHITE, 1
+                    });
+                }
+            }
+        }
 
         for (auto& entity : level.entities) {
             if (entity.destroyed) {
@@ -133,11 +207,11 @@ int main(int argc, char* argv[]) {
                 sourceRect = animIt->second.GetCurrentFrame();
             }
 
-            Vector2 screenPos = level.grid.GridToScreen(entity.position);
+            Vector2 screenPos = level.grid.GridToScreen(entity.precisePosition);
             // Offset simple de "camara" para centrar la grilla en la ventana;
             // IsoGridSystem no conoce pantalla/camara a proposito.
             screenPos.x += gfx.GetScreenWidth() / 2.0f;
-            screenPos.y += 50.0f;
+            screenPos.y += levelOriginY;
 
             Color tint = (entity.type == "obstacle") ? RED : WHITE;
             zsort.Submit(SpriteInstance{
@@ -158,7 +232,7 @@ int main(int argc, char* argv[]) {
         events.Update();
         audio.Update();
 
-        gfx.DrawText(defaultFont, "HoneyComb Engine - Runtime OK (usa las flechas)", {10, 10}, 20, DARKGRAY);
+        gfx.DrawText(defaultFont, "HoneyComb Engine - Runtime OK (flechas o WASD)", {10, 10}, 20, DARKGRAY);
         gfx.EndFrame();
     }
 

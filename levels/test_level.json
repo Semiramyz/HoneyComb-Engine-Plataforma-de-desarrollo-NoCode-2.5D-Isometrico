@@ -1,75 +1,31 @@
 {
-  "name": "test_level",
+  "name": "standard_room_shooter",
   "grid": {
-    "width": 6,
-    "height": 6,
+    "width": 10,
+    "height": 10,
     "tileWidth": 64,
     "tileHeight": 32
+  },
+  "visuals": {
+    "floor": {
+      "texture": "textures/floor.png",
+      "sourceRect": { "x": 0, "y": 0, "width": 64, "height": 64 }
+    },
+    "wall": {
+      "texture": "textures/wall.png",
+      "sourceRect": { "x": 0, "y": 0, "width": 32, "height": 32 }
+    }
   },
   "entities": [
     {
       "id": "player_1",
       "type": "player",
-      "position": {
-        "col": 1,
-        "row": 2
-      },
+      "position": { "col": 12, "row": 12 },
       "texture": "textures/player.png",
-      "sourceRect": {
-        "x": 0,
-        "y": 0,
-        "width": 16,
-        "height": 16
-      },
+      "sourceRect": { "x": 0, "y": 0, "width": 16, "height": 16 },
       "animation": "player_idle",
-      "collider": {
-        "width": 16,
-        "height": 16
-      }
-    },
-    {
-      "id": "target_1",
-      "type": "obstacle",
-      "position": {
-        "col": 3,
-        "row": 2
-      },
-      "texture": "textures/player.png",
-      "sourceRect": {
-        "x": 0,
-        "y": 0,
-        "width": 16,
-        "height": 16
-      },
-      "collider": {
-        "width": 16,
-        "height": 16
-      }
+      "collider": { "width": 16, "height": 16 }
     }
   ],
-  "events": [
-    {
-      "trigger": {
-        "type": "on_collision",
-        "params": {
-          "entityA": "player_1",
-          "entityB": "target_1"
-        }
-      },
-      "actions": [
-        {
-          "type": "destroy_entity",
-          "params": {
-            "entity": "target_1"
-          }
-        },
-        {
-          "type": "play_sound",
-          "params": {
-            "soundPath": "sounds/hit.wav"
-          }
-        }
-      ]
-    }
-  ]
+  "events": []
 }

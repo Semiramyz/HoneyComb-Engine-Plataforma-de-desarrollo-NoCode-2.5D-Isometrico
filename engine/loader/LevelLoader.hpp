@@ -14,6 +14,7 @@ struct LevelEntity {
     std::string id;
     std::string type;
     GridCoord position;
+    Vector2 precisePosition;
     const Texture2D* texture;
     Rectangle sourceRect;
     std::string animationClip;  // vacio si la entidad no se anima
@@ -25,6 +26,10 @@ struct LoadedLevel {
     std::string name;
     IsoGridSystem grid;
     std::vector<LevelEntity> entities;
+    const Texture2D* floorTexture;
+    Rectangle floorSourceRect;
+    const Texture2D* wallTexture;
+    Rectangle wallSourceRect;
 };
 
 // Orquestador de la Capa 3: lee un archivo de nivel (ver

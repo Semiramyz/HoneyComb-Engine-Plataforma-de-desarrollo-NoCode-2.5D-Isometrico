@@ -7,11 +7,15 @@ IsoGridSystem::IsoGridSystem(int gridWidth, int gridHeight, int tileWidth, int t
       tileWidth_(tileWidth), tileHeight_(tileHeight) {}
 
 Vector2 IsoGridSystem::GridToScreen(GridCoord coord) const {
+    return GridToScreen(Vector2{static_cast<float>(coord.col), static_cast<float>(coord.row)});
+}
+
+Vector2 IsoGridSystem::GridToScreen(Vector2 coord) const {
     float halfW = tileWidth_ / 2.0f;
     float halfH = tileHeight_ / 2.0f;
     return Vector2{
-        (coord.col - coord.row) * halfW,
-        (coord.col + coord.row) * halfH
+        (coord.x - coord.y) * halfW,
+        (coord.x + coord.y) * halfH
     };
 }
 

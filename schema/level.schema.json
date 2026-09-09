@@ -25,6 +25,13 @@
         }
       }
     },
+    "visuals": {
+      "type": "object",
+      "properties": {
+        "floor": { "$ref": "#/definitions/visualTile" },
+        "wall": { "$ref": "#/definitions/visualTile" }
+      }
+    },
     "entities": {
       "type": "array",
       "items": {
@@ -85,6 +92,23 @@
     }
   },
   "definitions": {
+    "visualTile": {
+      "type": "object",
+      "required": ["texture", "sourceRect"],
+      "properties": {
+        "texture": { "type": "string" },
+        "sourceRect": {
+          "type": "object",
+          "required": ["x", "y", "width", "height"],
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" },
+            "width": { "type": "number", "exclusiveMinimum": 0 },
+            "height": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        }
+      }
+    },
     "eventStep": {
       "type": "object",
       "required": ["type", "params"],

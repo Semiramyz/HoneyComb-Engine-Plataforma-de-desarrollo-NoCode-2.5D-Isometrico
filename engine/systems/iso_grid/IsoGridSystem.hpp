@@ -21,6 +21,7 @@ public:
     // Grilla (col, row) -> posicion en pantalla de la punta superior del tile
     // (sin offset de camara/origen; eso lo aplica quien dibuje).
     Vector2 GridToScreen(GridCoord coord) const;
+    Vector2 GridToScreen(Vector2 coord) const;
 
     // Posicion en pantalla -> celda de grilla bajo ese punto (para mouse/click).
     GridCoord ScreenToGrid(Vector2 screenPos) const;

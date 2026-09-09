@@ -28,8 +28,36 @@ LoadedLevel LevelLoader::Load(const std::string& levelPath, EventSystem& eventSy
     LoadedLevel level{
         levelJson.value("name", std::string("sin_nombre")),
         IsoGridSystem(gridWidth, gridHeight, tileWidth, tileHeight),
-        {}
+        {},
+        nullptr,
+        Rectangle{0, 0, 0, 0},
+        nullptr,
+        Rectangle{0, 0, 0, 0}
     };
+
+    if (levelJson.contains("visuals")) {
+        const auto& visualsJson = levelJson.at("visuals");
+        if (visualsJson.contains("floor")) {
+            const auto& floorJson = visualsJson.at("floor");
+            level.floorTexture = &resources_.GetTexture(
+                assets_.Resolve(floorJson.at("texture").get<std::string>()));
+            const auto& source = floorJson.at("sourceRect");
+            level.floorSourceRect = Rectangle{
+                source.at("x").get<float>(), source.at("y").get<float>(),
+                source.at("width").get<float>(), source.at("height").get<float>()
+            };
+        }
+        if (visualsJson.contains("wall")) {
+            const auto& wallJson = visualsJson.at("wall");
+            level.wallTexture = &resources_.GetTexture(
+                assets_.Resolve(wallJson.at("texture").get<std::string>()));
+            const auto& source = wallJson.at("sourceRect");
+            level.wallSourceRect = Rectangle{
+                source.at("x").get<float>(), source.at("y").get<float>(),
+                source.at("width").get<float>(), source.at("height").get<float>()
+            };
+        }
+    }
 
     if (levelJson.contains("entities")) {
         for (const auto& entityJson : levelJson.at("entities")) {
@@ -41,6 +69,10 @@ LoadedLevel LevelLoader::Load(const std::string& levelPath, EventSystem& eventSy
             entity.position = GridCoord{
                 posJson.at("col").get<int>(),
                 posJson.at("row").get<int>()
+            };
+            entity.precisePosition = Vector2{
+                static_cast<float>(entity.position.col),
+                static_cast<float>(entity.position.row)
             };
 
             std::string texturePath = assets_.Resolve(entityJson.at("texture").get<std::string>());
