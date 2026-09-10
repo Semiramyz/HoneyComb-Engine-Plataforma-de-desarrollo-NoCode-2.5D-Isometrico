@@ -65,7 +65,12 @@
             "description": "Opcional; ausente si la entidad no colisiona.",
             "properties": {
               "width": { "type": "number" },
-              "height": { "type": "number" }
+              "height": { "type": "number" },
+              "solid": {
+                "type": "boolean",
+                "default": false,
+                "description": "Si es true, bloquea el movimiento; si es false, solo participa en deteccion de contactos."
+              }
             }
           }
         }

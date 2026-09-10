@@ -92,8 +92,10 @@ LoadedLevel LevelLoader::Load(const std::string& levelPath, EventSystem& eventSy
                     colliderJson.value("width", 0.0f),
                     colliderJson.value("height", 0.0f)
                 };
+                entity.colliderSolid = colliderJson.value("solid", false);
             } else {
                 entity.colliderSize = Vector2{0, 0};
+                entity.colliderSolid = false;
             }
 
             level.entities.push_back(entity);

@@ -1,6 +1,7 @@
 #include "GraphicsDevice.hpp"
 
 GraphicsDevice::GraphicsDevice(int width, int height, const char* title) {
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(width, height, title);
 }
 

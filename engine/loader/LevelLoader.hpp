@@ -19,6 +19,7 @@ struct LevelEntity {
     Rectangle sourceRect;
     std::string animationClip;  // vacio si la entidad no se anima
     Vector2 colliderSize;        // {0,0} si la entidad no colisiona
+    bool colliderSolid = false;  // true si el collider bloquea el movimiento
     bool destroyed = false;      // borrado suave: la accion destroy_entity solo marca esto
 };
 

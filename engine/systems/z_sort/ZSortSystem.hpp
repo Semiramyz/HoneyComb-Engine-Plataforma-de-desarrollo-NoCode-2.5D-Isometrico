@@ -9,11 +9,15 @@
 struct SpriteInstance {
     const Texture2D* texture;
     Rectangle source;
-    Vector2 screenPosition;  // ya proyectada (ej. via IsoGridSystem::GridToScreen)
+
+    Vector2 screenPosition;  // dónde se dibuja el sprite
+    Vector2 sortPosition;    // punto de apoyo para profundidad
+
     Vector2 origin;
     float rotation;
     Color tint;
-    int layer = 0;  // desempate manual cuando screenPosition.y coincide/es muy cercano
+    int layer = 0;
+    Vector2 destinationSize = Vector2{0, 0};
 };
 
 // Ordena sprites por profundidad (algoritmo del pintor: menor Y en pantalla
