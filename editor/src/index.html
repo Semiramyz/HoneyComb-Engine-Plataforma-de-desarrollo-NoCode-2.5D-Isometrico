@@ -1,13 +1,25 @@
+<!--
+  Pagina contenedora de la interfaz. Angular la usa como plantilla al compilar y
+  le inyecta solo los <script> del bundle; el contenido real lo dibuja el
+  componente raiz dentro de <app-root> (ver src/main.ts).
+
+  Aca no se agrega markup del editor: todo vive en src/app/app.html.
+-->
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <title>HoneyComb Engine — Editor</title>
+  <!-- Necesario para que Angular resuelva las rutas del bundle. Bajo Electron
+       la app se sirve desde file://, y por eso el router usa hash routing (ver
+       app.config.ts) en vez de rutas por path. -->
   <base href="/">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/x-icon" href="favicon.ico">
 </head>
 <body>
+  <!-- Angular reemplaza esta etiqueta por el editor completo. Hasta que el
+       bundle arranca, la ventana se ve del color de fondo de styles.scss. -->
   <app-root></app-root>
 </body>
 </html>

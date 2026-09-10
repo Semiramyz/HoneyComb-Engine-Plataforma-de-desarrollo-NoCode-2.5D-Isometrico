@@ -1,9 +1,25 @@
+// Implementacion de ResourceManager. El contrato de la clase esta documentado
+// en el .hpp.
+//
+// Los cuatro Get* siguen el mismo patron "buscar o cargar": si la ruta ya esta
+// en la cache se devuelve lo que hay; si no, se carga una vez y se guarda. Por
+// eso dos entidades que usan la misma textura no la suben dos veces a la GPU.
+//
+// Todos devuelven una REFERENCIA a lo que vive en el mapa, no una copia: quien
+// llama no es dueno del recurso y no debe liberarlo. De eso se encarga
+// UnloadAll() desde el destructor.
+
 #include "ResourceManager.hpp"
 
+// El dispositivo de audio se abre junto con el manager y se cierra con el, para
+// que ningun System tenga que acordarse de hacerlo.
 ResourceManager::ResourceManager() {
     InitAudioDevice();
 }
 
+// El orden es obligatorio: primero se sueltan los recursos y recien despues se
+// cierra el dispositivo de audio. Al reves, liberar un Sound sobre un
+// dispositivo ya cerrado es comportamiento indefinido.
 ResourceManager::~ResourceManager() {
     UnloadAll();
     CloseAudioDevice();
@@ -55,6 +71,9 @@ const Music& ResourceManager::GetMusic(const std::string& path) {
     return music_.emplace(path, music).first->second;
 }
 
+// Libera todo lo cacheado y vacia los mapas. Lo llama el destructor, pero es
+// publico para poder descargar el nivel anterior al cambiar de nivel. Ojo:
+// despues de esto, cualquier referencia devuelta por un Get* queda colgada.
 void ResourceManager::UnloadAll() {
     for (auto& [path, texture] : textures_) {
         UnloadTexture(texture);

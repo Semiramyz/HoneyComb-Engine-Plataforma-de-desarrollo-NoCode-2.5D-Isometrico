@@ -1,3 +1,22 @@
+// =============================================================================
+// HoneyComb Engine - Editor (proceso principal de Electron)
+// =============================================================================
+//
+// Este es el unico proceso con acceso real al disco. La UI (Angular) corre en
+// el proceso "renderer", aislado en un sandbox de navegador, y no puede tocar
+// archivos: le pide todo a este por IPC.
+//
+//   Angular (app.ts)  ->  ProjectService  ->  window.honeycombProject
+//                                                    |  (contextBridge)
+//                                              preload.js
+//                                                    |  (ipcRenderer.invoke)
+//                                              este archivo  ->  disco
+//
+// Ese ida y vuelta parece rebuscado, pero es lo que permite tener
+// contextIsolation activado: la UI nunca ve "require" ni el modulo fs, asi que
+// un bug (o un nivel malicioso) no puede escribir donde se le antoje.
+// =============================================================================
+
 const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
@@ -37,6 +56,9 @@ function createWindow() {
     backgroundColor: '#14171d',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
+      // Las dos banderas de seguridad estandar de Electron. Con esto, el codigo
+      // de Angular solo ve lo que preload.js decide exponer: nada de require(),
+      // nada de fs, nada de acceso directo a Node.
       contextIsolation: true,
       nodeIntegration: false,
     },
@@ -76,6 +98,10 @@ function createWindow() {
     );
   });
 
+  // De donde sale la UI, en orden de preferencia:
+  //   1. ELECTRON_START_URL  - lo pone scripts/dev.js al arrancar con "npm run dev"
+  //   2. localhost:4200      - un "ng serve" levantado a mano en otra terminal
+  //   3. dist/               - la app ya empaquetada, sin dev server
   if (!app.isPackaged && process.env.ELECTRON_START_URL) {
     win.loadURL(process.env.ELECTRON_START_URL);
   } else if (!app.isPackaged) {
@@ -94,8 +120,14 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  // En macOS lo normal es que la app siga viva sin ventanas (queda en el Dock);
+  // en Windows y Linux, cerrar la ultima ventana cierra la aplicacion.
   if (process.platform !== 'darwin') app.quit();
 });
+
+// --- Guardar/abrir sueltos, con dialogo del sistema ------------------------
+// Estos dos no dependen de que haya un proyecto abierto: el usuario elige el
+// archivo a mano en el dialogo, y esa eleccion es la autorizacion.
 
 ipcMain.handle('project:save', async (_event, { defaultPath, contents }) => {
   const { canceled, filePath } = await dialog.showSaveDialog({
@@ -125,6 +157,11 @@ ipcMain.handle('project:open', async () => {
 // riesgo -- esto es una segunda barrera barata).
 let currentProjectRoot = null;
 
+// Convierte una ruta que llego del renderer en una ruta absoluta dentro del
+// proyecto, o tira error si se sale de el. La comprobacion es sobre el
+// resultado de path.relative(): si empieza con ".." o quedo absoluta, el
+// destino esta afuera. Asi se frenan tanto "../../etc/passwd" como una ruta
+// absoluta a otro disco.
 function resolveInProject(relativeOrAbsolutePath) {
   if (!currentProjectRoot) {
     throw new Error('No hay un proyecto abierto.');
@@ -156,6 +193,8 @@ ipcMain.handle('project:readFile', async (_event, relativePath) => {
 
 ipcMain.handle('project:writeFile', async (_event, { filePath, contents }) => {
   const targetPath = resolveInProject(filePath);
+  // mkdir recursivo: guardar el primer nivel de un proyecto recien creado no
+  // deberia fallar solo porque todavia no existe la carpeta levels/.
   await fs.mkdir(path.dirname(targetPath), { recursive: true });
   await fs.writeFile(targetPath, contents, 'utf-8');
 });
@@ -164,8 +203,11 @@ ipcMain.handle('project:listDir', async (_event, relativeDir) => {
   const targetDir = resolveInProject(relativeDir);
   try {
     const entries = await fs.readdir(targetDir, { withFileTypes: true });
+    // Solo archivos: el editor lista niveles y texturas, no navega carpetas.
     return entries.filter((entry) => entry.isFile()).map((entry) => entry.name);
   } catch (err) {
+    // Una carpeta que no existe es un caso normal (un proyecto sin texturas
+    // todavia), no un error: se devuelve vacio y la UI muestra el panel vacio.
     if (err.code === 'ENOENT') return [];
     throw err;
   }

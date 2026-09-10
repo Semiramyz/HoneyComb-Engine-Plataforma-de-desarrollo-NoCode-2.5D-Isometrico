@@ -26,6 +26,11 @@ export interface SourceRect {
 export interface ColliderConfig {
   width: number;
   height: number;
+  // FALTA: el schema y LevelLoader.cpp tienen tambien "solid" (bool, default
+  // false): true bloquea el movimiento, false lo deja pasar como sensor. Al no
+  // estar declarado aca, el editor no lo muestra ni lo conserva -- si se abre
+  // y se vuelve a guardar un nivel que lo usa (como levels/test_level.json),
+  // el campo se pierde y los obstaculos dejan de frenar al jugador.
 }
 
 export interface LevelEntity {
@@ -60,4 +65,8 @@ export interface Level {
   grid: GridConfig;
   entities: LevelEntity[];
   events: EventDefinition[];
+  // FALTA: el bloque "visuals" (texturas de piso y pared) que declaran el
+  // schema y LevelLoader.cpp. Mismo problema que ColliderConfig.solid: el
+  // editor lo descarta al guardar, y un nivel abierto y guardado desde aca se
+  // queda sin piso ni paredes en el runtime.
 }

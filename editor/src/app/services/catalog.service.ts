@@ -9,14 +9,22 @@ import { ProjectService } from './project.service';
 // esto, nunca de una lista hardcodeada en el componente.
 @Injectable({ providedIn: 'root' })
 export class CatalogService {
+  /** Null hasta que se cargue, y tambien si el proyecto no trae catalogo. */
   readonly catalog = signal<EventCatalog | null>(null);
 
   constructor(private readonly project: ProjectService) {}
 
+  /** Relee el catalogo del disco. Se llama al abrir un proyecto. */
   async load(): Promise<void> {
     const catalog = await this.project.readEventCatalog();
     this.catalog.set(catalog);
   }
+
+  // Los tres find* de abajo traducen el "type" que quedo guardado en el JSON
+  // del nivel a su definicion en el catalogo (etiqueta y parametros). Devuelven
+  // undefined si el catalogo no declara ese bloque -- pasa cuando se abre un
+  // nivel hecho con un catalogo mas nuevo -- y quien llama cae a mostrar el
+  // type crudo en vez de romper.
 
   findTrigger(type: string): CatalogEntry | undefined {
     return this.catalog()?.triggers.find((entry) => entry.type === type);

@@ -1,3 +1,22 @@
+<!--
+  Plantilla del editor. Una sola pantalla con docks fijos, al estilo Godot:
+
+    +-----------------------------------------------------+
+    |  barra superior (proyecto, nivel, guardar)           |
+    +-----------+-----------------------------+-----------+
+    |  escena   |                             |           |
+    |  recursos |         viewport            | inspector |
+    |           |     (canvas isometrico)     |           |
+    +-----------+-----------------------------+-----------+
+    |  eventos / salida                                   |
+    +-----------------------------------------------------+
+    |  barra de estado                                    |
+    +-----------------------------------------------------+
+
+  Todo lee de signals del componente (app.ts) y escribe llamando a sus metodos;
+  no hay estado propio de la plantilla. Se usa la sintaxis de control de flujo
+  moderna de Angular (@if / @for / @empty), no las directivas *ngIf / *ngFor.
+-->
 <div class="shell">
   <!-- ===================== BARRA SUPERIOR ===================== -->
   <header class="menubar">
@@ -39,6 +58,8 @@
     <span class="pill">{{ project.projectRoot() ?? 'Sin proyecto' }}</span>
   </header>
 
+  <!-- Dialogo de nivel nuevo. Click en el fondo cierra; el stopPropagation del
+       <section> evita que un click dentro del dialogo llegue al fondo y lo cierre. -->
   @if (showNewLevelDialog()) {
     <div class="modal-backdrop" (click)="cancelNewLevel()">
       <section class="modal" role="dialog" aria-modal="true" aria-labelledby="new-level-title"
@@ -110,7 +131,7 @@
 
   <!-- ===================== CUERPO ===================== -->
   <div class="body">
-    <!-- --------- DOCK IZQUIERDO --------- -->
+    <!-- --------- DOCK IZQUIERDO: arbol de escena + paleta de recursos --------- -->
     <aside class="dock dock--left">
       <section class="panel panel--grow">
         <div class="panel__head">
@@ -215,6 +236,10 @@
         <span class="toolbar__hint">Shift + arrastrar para desplazar</span>
       </div>
 
+      <!-- El canvas no tiene width/height en el HTML: se los fija draw() con
+           lo que mide el contenedor (ver el ResizeObserver en app.ts). Los
+           eventos de puntero cubren las tres cosas: seleccionar, colocar y
+           desplazar la vista. -->
       <div class="canvas-host">
         <canvas
           #viewport
@@ -236,7 +261,10 @@
       </div>
     </main>
 
-    <!-- --------- INSPECTOR --------- -->
+    <!-- --------- INSPECTOR ---------
+         Propiedades de la entidad seleccionada; si no hay ninguna, cae a las
+         propiedades del nivel (nombre y grilla). Cada control escribe con un
+         patch* del componente, nunca directo sobre el objeto del nivel. -->
     <aside class="dock dock--right">
       <section class="panel panel--grow">
         <div class="panel__head">
@@ -411,7 +439,17 @@
     </aside>
   </div>
 
-  <!-- ===================== DOCK INFERIOR ===================== -->
+  <!-- ===================== DOCK INFERIOR =====================
+       Dos pestanas: el editor de eventos y la consola de mensajes.
+
+       Los eventos son el corazon NoCode. Nada de esto esta escrito a mano: los
+       <select> se llenan con lo que declara schema/event_catalog.json y los
+       campos de parametros salen de paramRows(), que lee los params del bloque
+       elegido. Un bloque nuevo en el catalogo aparece aca sin tocar el HTML.
+
+       Los params de tipo entity_ref se muestran como desplegable de entidades
+       del nivel (y no como texto libre) para que no se pueda escribir un id
+       que no existe. -->
   <section class="dock dock--bottom">
     <div class="tabs">
       <button class="tab" [class.is-active]="bottomPanel() === 'eventos'" (click)="bottomPanel.set('eventos')">
@@ -536,7 +574,10 @@
     </div>
   </section>
 
-  <!-- ===================== BARRA DE ESTADO ===================== -->
+  <!-- ===================== BARRA DE ESTADO =====================
+       Ultimo mensaje del log y contador de entidades. El contador se pone en
+       amarillo al pasar ENTITY_WARN_THRESHOLD (app.ts): avisa antes de que la
+       escena empiece a comprometer los FPS del runtime. -->
   <footer class="statusbar">
     <span class="statusbar__msg">{{ status() }}</span>
     <div class="statusbar__spacer"></div>

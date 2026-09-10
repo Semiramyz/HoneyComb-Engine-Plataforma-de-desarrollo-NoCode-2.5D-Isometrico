@@ -3,8 +3,12 @@ import { Injectable, computed, signal } from '@angular/core';
 import { EventDefinition, GridConfig, Level, LevelEntity } from '../models/level.model';
 import { ProjectService } from './project.service';
 
+// 64x32 es la proporcion 2:1 estandar del pixel art isometrico, y el mismo
+// default que usa LevelLoader.cpp cuando el JSON no declara medidas de tile.
 const DEFAULT_GRID: GridConfig = { width: 10, height: 10, tileWidth: 64, tileHeight: 32 };
 
+// Se copia la grilla con spread: si se compartiera la constante, editar el
+// tamano de un nivel cambiaria el default de todos los que se creen despues.
 function emptyLevel(name: string): Level {
   return { name, grid: { ...DEFAULT_GRID }, entities: [], events: [] };
 }
@@ -16,9 +20,12 @@ function emptyLevel(name: string): Level {
 @Injectable({ providedIn: 'root' })
 export class LevelService {
   readonly level = signal<Level>(emptyLevel('nuevo_nivel'));
+  /** Archivo de origen dentro de levels/. Null si el nivel todavia no se guardo nunca. */
   readonly fileName = signal<string | null>(null);
+  /** Se guarda el id y no la entidad: la entidad se reemplaza en cada edicion (estado inmutable). */
   readonly selectedEntityId = signal<string | null>(null);
 
+  /** La entidad seleccionada, resuelta desde el id. undefined si se borro o no hay ninguna. */
   readonly selectedEntity = computed<LevelEntity | undefined>(() => {
     const id = this.selectedEntityId();
     return id ? this.level().entities.find((entity) => entity.id === id) : undefined;
@@ -26,6 +33,12 @@ export class LevelService {
 
   constructor(private readonly project: ProjectService) {}
 
+  // Todos los metodos de abajo reemplazan el nivel entero en vez de mutarlo
+  // (spread y map/filter, nunca push ni asignacion directa). Un signal solo
+  // avisa si la referencia cambia: mutando el objeto, el canvas no se
+  // redibujaria y el inspector se quedaria mostrando datos viejos.
+
+  /** Descarta el nivel actual y empieza uno vacio en memoria (no toca el disco). */
   createNew(name: string, grid: GridConfig = DEFAULT_GRID): void {
     this.level.set({ ...emptyLevel(name), grid: { ...grid } });
     this.fileName.set(null);
@@ -39,6 +52,10 @@ export class LevelService {
     this.selectedEntityId.set(null);
   }
 
+  /**
+   * Guarda en levels/. Un nivel nunca guardado toma su nombre como archivo, y
+   * a partir de ahi queda asociado a el (los guardados siguientes lo pisan).
+   */
   async save(): Promise<void> {
     const fileName = this.fileName() ?? `${this.level().name}.json`;
     await this.project.saveLevel(fileName, this.level());
@@ -65,6 +82,8 @@ export class LevelService {
       ...level,
       entities: level.entities.filter((entity) => entity.id !== id),
     }));
+    // Sin esto quedaria una seleccion apuntando a algo que ya no existe, y el
+    // inspector mostraria un panel vacio sin explicacion.
     if (this.selectedEntityId() === id) {
       this.selectedEntityId.set(null);
     }
@@ -73,6 +92,10 @@ export class LevelService {
   selectEntity(id: string | null): void {
     this.selectedEntityId.set(id);
   }
+
+  // Los eventos no tienen id propio en el schema: se los identifica por su
+  // posicion en el array, que es tambien el orden en que EventSystem los
+  // evalua. Por eso updateEvent/removeEvent trabajan con indices.
 
   addEvent(event: EventDefinition): void {
     this.level.update((level) => ({ ...level, events: [...level.events, event] }));

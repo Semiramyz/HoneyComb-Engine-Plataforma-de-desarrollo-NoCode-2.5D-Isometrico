@@ -11,6 +11,8 @@ public:
     void PlaySoundEffect(const Sound& sound);
 
     // Solo una pista de musica activa a la vez (reemplaza la anterior si habia).
+    // OJO: hoy loop=false no corta la repeticion -- ver el detalle en el
+    // Update() de AudioSystem.cpp.
     void PlayMusic(Music& music, bool loop = true);
     void StopMusic();
 

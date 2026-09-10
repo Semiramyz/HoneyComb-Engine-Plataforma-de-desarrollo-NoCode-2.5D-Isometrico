@@ -1,16 +1,18 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "HoneyComb Level",
+  "$comment": "Contrato de datos entre el editor y el runtime: describe el archivo de un nivel (levels/*.json). Es la unica pieza que los dos modulos comparten, y por eso ninguno de los dos puede cambiarlo por su cuenta. Un campo que se agregue aca hay que agregarlo tambien en editor/src/app/models/level.model.ts (el espejo en TypeScript) y en engine/loader/LevelLoader.cpp (quien lo lee del lado del motor). Los niveles son data-driven: cambiar el juego es cambiar este JSON, sin recompilar el motor.",
   "type": "object",
   "required": ["name", "grid", "entities", "events"],
   "properties": {
-    "name": { "type": "string" },
+    "name": { "type": "string", "description": "Nombre del nivel, para mostrar. No tiene por que coincidir con el del archivo." },
     "grid": {
       "type": "object",
+      "description": "Medidas del tablero isometrico: cuantas celdas tiene y cuanto mide cada tile en pixeles.",
       "required": ["width", "height", "tileWidth", "tileHeight"],
       "properties": {
-        "width": { "type": "integer", "minimum": 1 },
-        "height": { "type": "integer", "minimum": 1 },
+        "width": { "type": "integer", "minimum": 1, "description": "Cantidad de columnas de la grilla." },
+        "height": { "type": "integer", "minimum": 1, "description": "Cantidad de filas de la grilla." },
         "tileWidth": {
           "type": "integer",
           "minimum": 1,
@@ -27,6 +29,7 @@
     },
     "visuals": {
       "type": "object",
+      "description": "Opcional. Tiles de piso y de pared con los que el runtime dibuja el 'cuarto' del nivel. Las paredes no son entidades: el motor las genera sobre el borde de la grilla y, si estan, tambien frenan al jugador ahi. Si falta el bloque entero, el nivel se dibuja sin piso ni paredes.",
       "properties": {
         "floor": { "$ref": "#/definitions/visualTile" },
         "wall": { "$ref": "#/definitions/visualTile" }
@@ -34,6 +37,7 @@
     },
     "entities": {
       "type": "array",
+      "description": "Todo lo que el diseñador coloca sobre la grilla: jugador, obstaculos, items, sensores.",
       "items": {
         "type": "object",
         "required": ["id", "position", "texture", "sourceRect"],
@@ -42,6 +46,7 @@
           "type": { "type": "string", "description": "Tipo/categoria de la entidad (ej. player, obstaculo, item). Libre, uso del editor." },
           "position": {
             "type": "object",
+            "description": "Celda de la grilla donde arranca la entidad. Solo enteros: el editor coloca sobre la grilla. En ejecucion el motor mueve en continuo a partir de esta celda.",
             "required": ["col", "row"],
             "properties": {
               "col": { "type": "integer" },
@@ -51,6 +56,7 @@
           "texture": { "type": "string", "description": "Ruta relativa a assets/ (ver AssetResolver)." },
           "sourceRect": {
             "type": "object",
+            "description": "Recorte dentro de la textura, en pixeles. Permite que muchas entidades compartan un mismo spritesheet.",
             "required": ["x", "y", "width", "height"],
             "properties": {
               "x": { "type": "number" },
@@ -62,7 +68,7 @@
           "animation": { "type": "string", "description": "Nombre de clip registrado en AnimationSystem. Opcional." },
           "collider": {
             "type": "object",
-            "description": "Opcional; ausente si la entidad no colisiona.",
+            "description": "Caja de colision en pixeles. Opcional: si falta, la entidad no participa de la deteccion de contactos.",
             "properties": {
               "width": { "type": "number" },
               "height": { "type": "number" },
@@ -78,18 +84,23 @@
     },
     "events": {
       "type": "array",
-      "description": "Eventos condicion-accion configurados desde el editor. 'type' en cada paso referencia un ID de schema/event_catalog.json.",
+      "description": "La logica del juego sin escribir codigo, en la forma 'cuando pase X, si se cumple Y, haces Z'. El 'type' de cada paso referencia un ID de schema/event_catalog.json, que es donde se declara que parametros lleva. El motor los evalua una vez por frame, en el orden de este array.",
       "items": {
         "type": "object",
         "required": ["trigger", "actions"],
         "properties": {
-          "trigger": { "$ref": "#/definitions/eventStep" },
+          "trigger": {
+            "$ref": "#/definitions/eventStep",
+            "description": "El 'cuando': que tiene que pasar para que el evento se active. Obligatorio, uno solo."
+          },
           "conditions": {
             "type": "array",
+            "description": "El 'si': filtros que deben cumplirse TODOS (AND) para que las acciones corran. Opcional; sin condiciones, el trigger alcanza.",
             "items": { "$ref": "#/definitions/eventStep" }
           },
           "actions": {
             "type": "array",
+            "description": "El 'entonces': lo que se ejecuta, en este orden, cuando el trigger dispara y las condiciones se cumplen.",
             "items": { "$ref": "#/definitions/eventStep" }
           }
         }
@@ -99,6 +110,7 @@
   "definitions": {
     "visualTile": {
       "type": "object",
+      "description": "Un tile decorativo del nivel (piso o pared): que imagen usar y que parte de ella recortar.",
       "required": ["texture", "sourceRect"],
       "properties": {
         "texture": { "type": "string" },
@@ -116,10 +128,11 @@
     },
     "eventStep": {
       "type": "object",
+      "description": "Un bloque suelto de un evento. Triggers, condiciones y acciones tienen todos esta misma forma, y por eso el editor y el motor los parsean con el mismo codigo.",
       "required": ["type", "params"],
       "properties": {
-        "type": { "type": "string" },
-        "params": { "type": "object" }
+        "type": { "type": "string", "description": "ID del bloque en schema/event_catalog.json. Del lado del motor, la clave con la que EventSystem tiene registrada su implementacion." },
+        "params": { "type": "object", "description": "Los valores que la persona configuro en el editor. Las claves son las que declara el bloque en el catalogo." }
       }
     }
   }

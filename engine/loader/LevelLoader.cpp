@@ -10,6 +10,12 @@
 LevelLoader::LevelLoader(ResourceManager& resources, AssetResolver& assets)
     : resources_(resources), assets_(assets) {}
 
+// Lee el archivo de nivel y devuelve todo lo que el runtime necesita para
+// correrlo. Los eventos no van en el LoadedLevel: se cargan directo en el
+// EventSystem que se recibe, porque es ahi donde se evaluan.
+//
+// Convencion en todo el metodo: at() para lo obligatorio (si falta, el nivel
+// esta roto y conviene enterarse ya), value() con default para lo opcional.
 LoadedLevel LevelLoader::Load(const std::string& levelPath, EventSystem& eventSystem) {
     std::ifstream file(levelPath);
     if (!file.is_open()) {
@@ -19,6 +25,9 @@ LoadedLevel LevelLoader::Load(const std::string& levelPath, EventSystem& eventSy
     nlohmann::json levelJson;
     file >> levelJson;
 
+    // --- Grilla -------------------------------------------------------------
+    // Las medidas del tile son opcionales; el default 64x32 es la proporcion
+    // 2:1 estandar del pixel art isometrico (mismo default que el editor).
     const auto& gridJson = levelJson.at("grid");
     int gridWidth = gridJson.at("width").get<int>();
     int gridHeight = gridJson.at("height").get<int>();
@@ -35,6 +44,11 @@ LoadedLevel LevelLoader::Load(const std::string& levelPath, EventSystem& eventSy
         Rectangle{0, 0, 0, 0}
     };
 
+    // --- Visuales del nivel (piso y pared) ----------------------------------
+    // Bloque opcional. Si falta, las texturas quedan en nullptr y main.cpp
+    // simplemente no dibuja piso ni paredes (y sin pared tampoco hay bloqueo
+    // en el perimetro). Los punteros apuntan a la cache del ResourceManager,
+    // que es duena de las texturas y las libera al final.
     if (levelJson.contains("visuals")) {
         const auto& visualsJson = levelJson.at("visuals");
         if (visualsJson.contains("floor")) {
@@ -59,6 +73,7 @@ LoadedLevel LevelLoader::Load(const std::string& levelPath, EventSystem& eventSy
         }
     }
 
+    // --- Entidades ----------------------------------------------------------
     if (levelJson.contains("entities")) {
         for (const auto& entityJson : levelJson.at("entities")) {
             LevelEntity entity;
@@ -70,11 +85,17 @@ LoadedLevel LevelLoader::Load(const std::string& levelPath, EventSystem& eventSy
                 posJson.at("col").get<int>(),
                 posJson.at("row").get<int>()
             };
+            // El JSON solo guarda celdas enteras (el editor coloca sobre la
+            // grilla), pero el runtime mueve en continuo: precisePosition
+            // arranca en la celda declarada y desde ahi lleva los decimales.
             entity.precisePosition = Vector2{
                 static_cast<float>(entity.position.col),
                 static_cast<float>(entity.position.row)
             };
 
+            // La ruta del JSON es relativa a assets/; AssetResolver la
+            // completa y ResourceManager cachea, asi que dos entidades con la
+            // misma textura comparten una sola carga en GPU.
             std::string texturePath = assets_.Resolve(entityJson.at("texture").get<std::string>());
             entity.texture = &resources_.GetTexture(texturePath);
 
@@ -86,6 +107,9 @@ LoadedLevel LevelLoader::Load(const std::string& levelPath, EventSystem& eventSy
 
             entity.animationClip = entityJson.value("animation", std::string(""));
 
+            // Collider opcional. size {0,0} = la entidad no participa de la
+            // deteccion; solid=false = participa (dispara on_collision) pero
+            // no frena al jugador, o sea, funciona como sensor/trigger.
             if (entityJson.contains("collider")) {
                 const auto& colliderJson = entityJson.at("collider");
                 entity.colliderSize = Vector2{
@@ -102,6 +126,10 @@ LoadedLevel LevelLoader::Load(const std::string& levelPath, EventSystem& eventSy
         }
     }
 
+    // --- Eventos ------------------------------------------------------------
+    // Se cargan directo en el EventSystem (no viajan dentro de LoadedLevel):
+    // el nivel describe QUE eventos hay, y el EventSystem ya tiene registrado
+    // COMO se ejecuta cada type.
     if (levelJson.contains("events")) {
         eventSystem.LoadEvents(EventLoader::Parse(levelJson.at("events")));
     }

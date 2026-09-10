@@ -1,4 +1,5 @@
 {
+  "$comment": "Catalogo de bloques disponibles para armar eventos en el editor. Es la lista de piezas del NoCode: el editor genera los formularios del panel de eventos leyendo esto, sin nada hardcodeado, asi que sumar un bloque aca lo hace aparecer en la interfaz sin tocar codigo Angular. Del lado del motor, cada 'type' necesita ademas su implementacion registrada una vez en C++ (RegisterTrigger / RegisterCondition / RegisterAction, ver engine/main.cpp). Un type declarado aca pero no registrado alla simplemente no hace nada: el nivel sigue corriendo.",
   "triggers": [
     {
       "type": "on_collision",

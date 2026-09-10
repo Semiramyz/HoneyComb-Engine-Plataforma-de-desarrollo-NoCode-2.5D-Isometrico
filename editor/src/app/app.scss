@@ -1,22 +1,42 @@
-/* Tema oscuro tipo Godot/GameMaker: docks acoplados, cromo minimo, acento
-   ambar por la identidad HoneyComb. Todo el color vive en estas variables. */
-:host {
-  --bg-deep: #14171d;
-  --bg-panel: #1e222a;
-  --bg-panel-alt: #232833;
-  --bg-head: #272d38;
-  --bg-input: #171b21;
-  --border: #101319;
-  --border-soft: #333a46;
+/* Estilos del editor (componente App). La base global -- fondo y tipografia de
+   la pagina -- esta en src/styles.scss; todo lo demas es esto.
 
+   Tema oscuro tipo Godot/GameMaker: docks acoplados, cromo minimo, acento ambar
+   por la identidad HoneyComb. Todo el color vive en las variables de :host, asi
+   que cambiar la paleta entera se hace ahi y en ningun otro lado.
+
+   Dos convenciones que se repiten en todo el archivo:
+
+     - Nomenclatura BEM con anidado de Sass: .bloque, &__elemento, &--variante.
+       Un ".panel__head" es la cabecera de un ".panel", y un ".btn--primary" es
+       la variante destacada de un ".btn".
+
+     - "is-active" marca el estado encendido de un control (herramienta elegida,
+       pestana abierta, entidad seleccionada). La clase la pone la plantilla con
+       [class.is-active], nunca el CSS. */
+:host {
+  /* Fondos, del mas oscuro al mas claro. La jerarquia es intencional: el fondo
+     profundo es el lienzo, los paneles se apoyan encima y las cabeceras quedan
+     un escalon mas arriba, para que la profundidad se lea sin usar sombras. */
+  --bg-deep: #14171d;    /* lienzo del viewport y fondo de la ventana */
+  --bg-panel: #1e222a;   /* cuerpo de los docks */
+  --bg-panel-alt: #232833; /* filas y tarjetas dentro de un dock */
+  --bg-head: #272d38;    /* cabeceras, barras y pestanas */
+  --bg-input: #171b21;   /* campos de texto: mas oscuros que el panel, se hunden */
+
+  --border: #101319;      /* separacion fuerte entre zonas (casi negro) */
+  --border-soft: #333a46; /* separacion suave dentro de una zona */
+
+  /* Tres niveles de texto: el normal, el atenuado para etiquetas y datos
+     secundarios, y el brillante para lo que tiene el foco. */
   --text: #c7cdd8;
   --text-dim: #79818f;
   --text-bright: #eef1f6;
 
-  --accent: #f5a623;
-  --accent-dim: #7a5312;
-  --danger: #e05a5a;
-  --ok: #5be0a0;
+  --accent: #f5a623;     /* ambar HoneyComb: seleccion, foco y estado activo */
+  --accent-dim: #7a5312; /* el mismo ambar de fondo, para rellenos sin encandilar */
+  --danger: #e05a5a;     /* borrar y obstaculos */
+  --ok: #5be0a0;         /* colliders e items */
 
   display: block;
   height: 100vh;
@@ -26,10 +46,21 @@
   background: var(--bg-deep);
 }
 
+/* border-box en todo: los anchos fijos de los docks incluyen su borde y su
+   padding, asi que las cuentas del layout cierran sin restar a mano. */
 * {
   box-sizing: border-box;
 }
 
+/* Esqueleto de la ventana: cuatro bandas horizontales, de arriba abajo.
+
+     38px  barra superior (proyecto, nivel, guardar)
+     1fr   cuerpo -- se queda con todo el alto sobrante
+     220px dock inferior (eventos / salida)
+     24px  barra de estado
+
+   Solo la fila del cuerpo es elastica; las otras tres tienen alto fijo para que
+   la interfaz no se mueva sola al cambiar el contenido. */
 .shell {
   display: grid;
   grid-template-rows: 38px 1fr 220px 24px;
@@ -85,6 +116,14 @@
 }
 
 /* ---------- Cuerpo ---------- */
+/* Tres columnas: dock izquierdo (escena + recursos), viewport y dock derecho
+   (inspector). Los laterales son fijos y el viewport se queda con el resto, que
+   es como se comportan los editores de juego.
+
+   El "min-height: 0" que aparece aca y en casi todos los contenedores de abajo
+   NO es decorativo: por defecto un hijo de grid o flex no achica por debajo de
+   su contenido, asi que sin esto un panel con muchas entidades estira la
+   ventana en vez de mostrar su propia barra de scroll. */
 .body {
   display: grid;
   grid-template-columns: 232px 1fr 272px;
@@ -143,6 +182,9 @@
     letter-spacing: 0;
   }
 
+  /* El cuerpo del panel es lo unico que scrollea; la cabecera queda fija
+     arriba. Las tres variantes de abajo son las tres formas de contenido que
+     hay: lista (arbol de escena), mosaico (recursos) y formulario (inspector). */
   &__body {
     overflow: auto;
     min-height: 0;
@@ -150,6 +192,9 @@
     &--list {
       padding: 3px 0;
     }
+    /* auto-fill con minimo de 66px: entran tantas miniaturas por fila como
+       permita el ancho del dock, sin fijar el numero de columnas a mano. El
+       alto se topea para que la paleta no se coma el arbol de escena. */
     &--tiles {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(66px, 1fr));
@@ -337,6 +382,13 @@
   }
 }
 
+/* Contenedor del canvas. Es "relative" para que el overlay de chips se pueda
+   posicionar contra el, y "overflow: hidden" para que el canvas no desborde al
+   ampliar el zoom.
+
+   Es tambien el elemento que mide el ResizeObserver de app.ts: el canvas no
+   tiene tamano propio, lo toma de aca. Por eso se observa este div y no el
+   canvas (dibujar cambia el tamano del canvas y se entraria en un bucle). */
 .canvas-host {
   position: relative;
   flex: 1;
@@ -353,6 +405,11 @@
   cursor: crosshair;
 }
 
+/* Chips informativos (celda bajo el cursor, medidas de la grilla) apoyados
+   sobre la esquina inferior izquierda del canvas.
+
+   "pointer-events: none" es imprescindible: sin eso los chips se comen los
+   clicks y no se podria colocar una entidad debajo de ellos. */
 .overlay {
   position: absolute;
   left: 8px;
@@ -457,6 +514,10 @@
 }
 
 /* ---------- Dialogo de nivel nuevo ---------- */
+/* Fondo oscurecido del dialogo. "inset: 0" lo estira sobre toda la ventana y
+   "place-items: center" centra el dialogo sin cuentas. Ademas de oscurecer,
+   bloquea el resto de la interfaz: un click aca cierra el dialogo (ver el
+   (click) del backdrop en app.html). */
 .modal-backdrop {
   position: fixed;
   z-index: 10;
@@ -613,6 +674,9 @@
   }
 }
 
+/* Etiquetas "Cuando" / "Entonces" de cada fila de evento. Los dos colores no
+   son decorativos: separan de un vistazo la causa (ambar, el acento del editor)
+   del efecto (azul), que es la lectura basica de un evento NoCode. */
 .badge {
   padding: 2px 7px;
   border-radius: 2px;
@@ -631,6 +695,8 @@
   }
 }
 
+/* Consola de la pestana Salida: el log que llena note() en app.ts. Monoespaciada
+   porque casi siempre muestra rutas y nombres de archivo. */
 .console {
   font-family: ui-monospace, "Cascadia Mono", monospace;
   font-size: 11px;
@@ -639,6 +705,8 @@
     padding: 1px 0;
     color: var(--text-dim);
 
+    /* El prompt va por CSS y no en el texto del mensaje: asi el log guardado en
+       app.ts queda limpio, sin caracteres de presentacion. */
     &::before {
       content: "› ";
       color: var(--accent);
@@ -664,6 +732,10 @@
   }
 }
 
+/* Capsulas de solo lectura de la barra de estado y la barra superior
+   (contadores, ruta del proyecto). La variante --warn las pinta de ambar: la usa
+   el contador de entidades al pasar el umbral que avisa antes de comprometer
+   los FPS del runtime (ENTITY_WARN_THRESHOLD en app.ts). */
 .pill {
   padding: 1px 8px;
   border: 1px solid var(--border-soft);
@@ -679,7 +751,10 @@
   }
 }
 
-/* ---------- Botones ---------- */
+/* ---------- Botones ----------
+   .btn es el boton de la interfaz en general (barras y dialogos); .tool, mas
+   arriba, es el de la barra del viewport. Se distinguen porque los .tool viven
+   apretados en grupos y marcan estado con is-active, y los .btn no. */
 .btn {
   height: 24px;
   padding: 0 11px;
@@ -730,7 +805,10 @@
   grid-column: 1 / -1;
 }
 
-/* ---------- Scrollbars ---------- */
+/* ---------- Scrollbars ----------
+   Las barras de scroll nativas de Windows son claras y cortan el tema oscuro.
+   Esto es propietario de WebKit/Chromium, lo que aca alcanza: el editor corre
+   siempre sobre Electron. */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;

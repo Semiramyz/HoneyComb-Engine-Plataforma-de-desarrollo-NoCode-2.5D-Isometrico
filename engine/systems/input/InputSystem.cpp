@@ -1,5 +1,8 @@
 #include "InputSystem.hpp"
 
+// Implementacion de InputSystem. El contrato de la clase, y por que conviven
+// las consultas por tecla con las acciones con nombre, estan en el .hpp.
+//
 // Todos los metodos de abajo se llaman igual que su funcion global de raylib
 // correspondiente; se califican con :: para no recursar sobre si mismos.
 
@@ -27,9 +30,15 @@ bool InputSystem::IsMouseButtonPressed(int button) const {
     return ::IsMouseButtonPressed(button);
 }
 
+// Enlaza una accion a una tecla. Reasignar es simplemente volver a llamar con
+// la misma accion: el mapa pisa el valor anterior.
 void InputSystem::BindAction(const std::string& actionName, int key) {
     actionBindings_[actionName] = key;
 }
+
+// Los dos IsAction* de abajo traducen nombre -> tecla y recien ahi preguntan.
+// Una accion sin enlazar devuelve false en vez de reventar: es lo seguro, un
+// control sin asignar simplemente no responde.
 
 bool InputSystem::IsActionDown(const std::string& actionName) const {
     auto it = actionBindings_.find(actionName);
