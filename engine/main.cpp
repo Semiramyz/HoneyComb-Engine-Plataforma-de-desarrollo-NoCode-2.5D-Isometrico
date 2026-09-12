@@ -88,7 +88,8 @@ int main(int argc, char *argv[])
     // GPU. Por eso la ventana se crea antes que el ResourceManager.
     GraphicsDevice gfx(800, 450, "HoneyComb Engine - Runtime");
     ResourceManager resources;
-    AssetResolver assets;
+    const std::filesystem::path assetsRoot = levelPath.parent_path().parent_path() / "assets";
+    AssetResolver assets(assetsRoot.string());
     EventSystem events;
     LevelLoader loader(resources, assets);
 
