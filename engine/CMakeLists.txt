@@ -58,7 +58,9 @@ endif()
 # hace que engine.exe funcione sin depender de donde se lo lance.
 foreach(_data assets levels)
     add_custom_command(TARGET engine POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+        COMMAND ${CMAKE_COMMAND} -E remove_directory
+            "$<TARGET_FILE_DIR:engine>/${_data}"
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${CMAKE_CURRENT_SOURCE_DIR}/../${_data}" "$<TARGET_FILE_DIR:engine>/${_data}"
     )
 endforeach()
