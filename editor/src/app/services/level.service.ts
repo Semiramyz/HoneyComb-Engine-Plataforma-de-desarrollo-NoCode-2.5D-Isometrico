@@ -1,6 +1,6 @@
 import { Injectable, computed, signal } from '@angular/core';
 
-import { EventDefinition, GridConfig, Level, LevelEntity } from '../models/level.model';
+import { EventDefinition, GridConfig, Level, LevelEntity, MapTile } from '../models/level.model';
 import { ProjectService } from './project.service';
 
 // 64x32 es la proporcion 2:1 estandar del pixel art isometrico, y el mismo
@@ -87,6 +87,32 @@ export class LevelService {
     if (this.selectedEntityId() === id) {
       this.selectedEntityId.set(null);
     }
+  }
+
+  /** Materializa la grilla legacy y alterna piso o pared en una celda. */
+  toggleTile(col: number, row: number, kind: 'floor' | 'wall'): void {
+    this.level.update((level) => {
+      const tiles = level.tiles
+        ? level.tiles.map((tile) => ({ ...tile }))
+        : Array.from({ length: level.grid.height }, (_, tileRow) =>
+            Array.from({ length: level.grid.width }, (_, tileCol): MapTile => ({
+              col: tileCol,
+              row: tileRow,
+              floor: true,
+              wall: tileCol === 0 || tileRow === 0 ||
+                tileCol === level.grid.width - 1 || tileRow === level.grid.height - 1,
+            })),
+          ).flat();
+      const index = tiles.findIndex((tile) => tile.col === col && tile.row === row);
+      const current = index >= 0 ? tiles[index] : { col, row, floor: false, wall: false };
+      const updated = { ...current, [kind]: !(current[kind] ?? false) };
+      if (index >= 0) {
+        tiles[index] = updated;
+      } else {
+        tiles.push(updated);
+      }
+      return { ...level, tiles };
+    });
   }
 
   selectEntity(id: string | null): void {

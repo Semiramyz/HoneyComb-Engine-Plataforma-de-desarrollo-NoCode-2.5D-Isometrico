@@ -31,6 +31,8 @@ struct LoadedLevel {
     Rectangle floorSourceRect;
     const Texture2D* wallTexture;
     Rectangle wallSourceRect;
+    std::vector<GridCoord> floorTiles;
+    std::vector<GridCoord> wallTiles;
 };
 
 // Orquestador de la Capa 3: lee un archivo de nivel (ver

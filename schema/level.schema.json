@@ -35,6 +35,11 @@
         "wall": { "$ref": "#/definitions/visualTile" }
       }
     },
+    "tiles": {
+      "type": "array",
+      "description": "Celdas que forman la forma irregular del mapa. Si falta, se usa una grilla rectangular con piso completo y pared perimetral.",
+      "items": { "$ref": "#/definitions/mapTile" }
+    },
     "entities": {
       "type": "array",
       "description": "Todo lo que el diseñador coloca sobre la grilla: jugador, obstaculos, items, sensores.",
@@ -124,6 +129,16 @@
             "height": { "type": "number", "exclusiveMinimum": 0 }
           }
         }
+      }
+    },
+    "mapTile": {
+      "type": "object",
+      "required": ["col", "row"],
+      "properties": {
+        "col": { "type": "integer", "minimum": 0 },
+        "row": { "type": "integer", "minimum": 0 },
+        "floor": { "type": "boolean", "default": true },
+        "wall": { "type": "boolean", "default": false }
       }
     },
     "eventStep": {

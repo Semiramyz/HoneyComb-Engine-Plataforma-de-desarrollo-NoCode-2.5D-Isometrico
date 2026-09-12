@@ -48,6 +48,13 @@ export interface LevelEntity {
   collider?: ColliderConfig;
 }
 
+export interface MapTile {
+  col: number;
+  row: number;
+  floor?: boolean;
+  wall?: boolean;
+}
+
 /** Un paso individual (trigger, condicion o accion). 'type' referencia un ID de event_catalog.json. */
 export interface EventStep {
   type: string;
@@ -65,8 +72,9 @@ export interface Level {
   grid: GridConfig;
   entities: LevelEntity[];
   events: EventDefinition[];
-  // FALTA: el bloque "visuals" (texturas de piso y pared) que declaran el
-  // schema y LevelLoader.cpp. Mismo problema que ColliderConfig.solid: el
-  // editor lo descarta al guardar, y un nivel abierto y guardado desde aca se
-  // queda sin piso ni paredes en el runtime.
+  visuals?: {
+    floor?: { texture: string; sourceRect: SourceRect };
+    wall?: { texture: string; sourceRect: SourceRect };
+  };
+  tiles?: MapTile[];
 }

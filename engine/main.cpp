@@ -315,28 +315,33 @@ int main(int argc, char *argv[])
                                0.5f + halfHeight;
                 };
 
-                // 1) Paredes del perimetro. Son implicitas: no son entidades
-                // del nivel, se generan sobre los bordes de la grilla siempre
-                // que el nivel declare una textura de pared (ver el dibujado
-                // mas abajo, que recorre exactamente las mismas celdas).
+                // Una forma irregular tambien es una frontera fisica: no se
+                // puede avanzar a una celda que no declara piso.
+                bool candidateHasFloor = false;
+                for (const auto& floorTile : level.floorTiles)
+                {
+                    if (overlapsTile(candidate, playerHalfWidth, playerHalfHeight,
+                                     floorTile.col, floorTile.row))
+                    {
+                        candidateHasFloor = true;
+                        break;
+                    }
+                }
+                if (!candidateHasFloor)
+                {
+                    blocked = true;
+                }
+
+                // 1) Paredes declaradas por celda en el nivel.
                 if (level.wallTexture)
                 {
-                    for (int row = 0; row < level.grid.GetGridHeight() && !blocked; ++row)
+                    for (const auto& wallTile : level.wallTiles)
                     {
-                        for (int col = 0; col < level.grid.GetGridWidth(); ++col)
+                        if (overlapsTile(candidate, playerHalfWidth, playerHalfHeight,
+                                         wallTile.col, wallTile.row))
                         {
-                            // Solo el borde; el interior del cuarto esta libre.
-                            if (col != 0 && row != 0 &&
-                                col != level.grid.GetGridWidth() - 1 &&
-                                row != level.grid.GetGridHeight() - 1)
-                            {
-                                continue;
-                            }
-                            if (overlapsTile(candidate, playerHalfWidth, playerHalfHeight, col, row))
-                            {
-                                blocked = true;
-                                break;
-                            }
+                            blocked = true;
+                            break;
                         }
                     }
                 }
@@ -384,16 +389,14 @@ int main(int argc, char *argv[])
         // Nada se dibuja directo: todo se ENCOLA en el ZSortSystem, que al final
         // ordena por profundidad y recien ahi dibuja. Por eso un personaje puede
         // quedar tapado por una pared que se encolo antes que el.
-        for (int row = 0; row < level.grid.GetGridHeight(); ++row)
+        for (const auto& floorTile : level.floorTiles)
         {
-            for (int col = 0; col < level.grid.GetGridWidth(); ++col)
-            {
-                Vector2 screenPos = gridToScreen(
-                    Vector2{static_cast<float>(col), static_cast<float>(row)});
+            Vector2 screenPos = gridToScreen(
+                Vector2{static_cast<float>(floorTile.col), static_cast<float>(floorTile.row)});
 
-                if (level.floorTexture)
-                {
-                    zsort.Submit(SpriteInstance{
+            if (level.floorTexture)
+            {
+                zsort.Submit(SpriteInstance{
                         level.floorTexture,
                         level.floorSourceRect,
 
@@ -410,9 +413,8 @@ int main(int argc, char *argv[])
 
                         Vector2{0, 0},
                         0.0f,
-                        WHITE,
-                        0});
-                }
+                    WHITE,
+                    0});
             }
         }
 
@@ -422,19 +424,10 @@ int main(int argc, char *argv[])
         // que la deteccion de bloqueo de mas arriba.
         if (level.wallTexture)
         {
-            for (int row = 0; row < level.grid.GetGridHeight(); ++row)
+            for (const auto& wallTile : level.wallTiles)
             {
-                for (int col = 0; col < level.grid.GetGridWidth(); ++col)
-                {
-                    if (col != 0 && row != 0 &&
-                        col != level.grid.GetGridWidth() - 1 &&
-                        row != level.grid.GetGridHeight() - 1)
-                    {
-                        continue;
-                    }
-                    // Dibujar paredes en los bordes de la grilla
-                    Vector2 screenPos = gridToScreen(
-                        Vector2{static_cast<float>(col), static_cast<float>(row)});
+                Vector2 screenPos = gridToScreen(
+                    Vector2{static_cast<float>(wallTile.col), static_cast<float>(wallTile.row)});
                     zsort.Submit(SpriteInstance{
                         level.wallTexture,
                         level.wallSourceRect,
@@ -456,10 +449,9 @@ int main(int argc, char *argv[])
 
                         // Destino cuadrado de tileWidth x tileWidth: la textura
                         // fuente es de 32px y hay que estirarla al tamano del tile.
-                        Vector2{
-                            static_cast<float>(level.grid.GetTileWidth()),
-                            static_cast<float>(level.grid.GetTileWidth())}});
-                }
+                    Vector2{
+                        static_cast<float>(level.grid.GetTileWidth()),
+                        static_cast<float>(level.grid.GetTileWidth())}});
             }
         }
 
@@ -501,7 +493,8 @@ int main(int argc, char *argv[])
 
                 Vector2{0, 0},
                 0.0f,
-                tint
+                tint,
+                2
             });
             // Los colliders se encolan en este mismo recorrido para no volver a
             // iterar el vector; CollisionSystem los cruza todos contra todos

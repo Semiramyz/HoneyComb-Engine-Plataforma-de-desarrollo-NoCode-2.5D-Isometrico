@@ -41,7 +41,9 @@ LoadedLevel LevelLoader::Load(const std::string& levelPath, EventSystem& eventSy
         nullptr,
         Rectangle{0, 0, 0, 0},
         nullptr,
-        Rectangle{0, 0, 0, 0}
+        Rectangle{0, 0, 0, 0},
+        {},
+        {}
     };
 
     // --- Visuales del nivel (piso y pared) ----------------------------------
@@ -70,6 +72,36 @@ LoadedLevel LevelLoader::Load(const std::string& levelPath, EventSystem& eventSy
                 source.at("x").get<float>(), source.at("y").get<float>(),
                 source.at("width").get<float>(), source.at("height").get<float>()
             };
+        }
+    }
+
+    // Sin "tiles" se conserva el nivel rectangular legacy. Con "tiles", el
+    // editor puede omitir celdas y decidir pared por pared.
+    if (levelJson.contains("tiles")) {
+        for (const auto& tileJson : levelJson.at("tiles")) {
+            GridCoord tile{
+                tileJson.at("col").get<int>(),
+                tileJson.at("row").get<int>()
+            };
+            if (!level.grid.IsValidCoord(tile)) {
+                throw std::runtime_error("LevelLoader: tile fuera de la grilla");
+            }
+            if (tileJson.value("floor", true)) {
+                level.floorTiles.push_back(tile);
+            }
+            if (tileJson.value("wall", false)) {
+                level.wallTiles.push_back(tile);
+            }
+        }
+    } else {
+        for (int row = 0; row < gridHeight; ++row) {
+            for (int col = 0; col < gridWidth; ++col) {
+                GridCoord tile{col, row};
+                level.floorTiles.push_back(tile);
+                if (col == 0 || row == 0 || col == gridWidth - 1 || row == gridHeight - 1) {
+                    level.wallTiles.push_back(tile);
+                }
+            }
         }
     }
 

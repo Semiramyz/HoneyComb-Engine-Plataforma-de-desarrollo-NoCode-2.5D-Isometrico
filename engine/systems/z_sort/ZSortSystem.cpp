@@ -34,9 +34,8 @@ void ZSortSystem::Flush() {
                 return a.sortPosition.y < b.sortPosition.y;
             }
 
-            // Empate exacto (tipico entre piso y pared de la misma celda): lo
-            // resuelve el layer, para que el resultado no dependa del orden en
-            // que se hayan encolado.
+            // En un empate, el layer garantiza piso -> pared -> entidad sin
+            // depender del orden en que se hayan encolado.
             return a.layer < b.layer;
         });
 

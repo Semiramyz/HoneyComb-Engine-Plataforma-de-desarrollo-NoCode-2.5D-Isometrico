@@ -206,6 +206,8 @@
           >
             ✚
           </button>
+          <button class="tool" [class.is-active]="tool() === 'floor'" (click)="tool.set('floor')" title="Alternar piso">▱</button>
+          <button class="tool" [class.is-active]="tool() === 'wall'" (click)="tool.set('wall')" title="Alternar pared">▥</button>
         </div>
 
         <div class="toolbar__sep"></div>

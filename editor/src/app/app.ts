@@ -37,7 +37,7 @@ import { LevelService } from './services/level.service';
 import { ProjectService } from './services/project.service';
 
 /** Herramienta activa del viewport: seleccionar entidades o colocarlas. */
-type Tool = 'select' | 'place';
+type Tool = 'select' | 'place' | 'floor' | 'wall';
 /** Las tres secciones de event_catalog.json, para acceder a ellas por nombre. */
 type CatalogKind = 'triggers' | 'conditions' | 'actions';
 /** Plantillas del dialogo "nivel nuevo": vacio, con jugador, o escena de prueba. */
@@ -354,8 +354,17 @@ export class App {
       return;
     }
 
-    if (this.tool() === 'place') {
+    const activeTool = this.tool();
+    if (activeTool === 'place') {
       this.placeEntity(this.coordAt(event));
+    } else if (activeTool === 'floor' || activeTool === 'wall') {
+      const cell = this.coordAt(event);
+      const grid = this.grid();
+      if (!new IsoProjection(grid.tileWidth, grid.tileHeight).isValidCoord(cell, grid.width, grid.height)) {
+        return;
+      }
+      this.levels.toggleTile(cell.col, cell.row, activeTool);
+      this.dirty.set(true);
     } else {
       this.levels.selectEntity(this.entityAt(event));
     }
@@ -824,6 +833,25 @@ export class App {
           ctx.fill();
           ctx.strokeStyle = '#262c37';
           ctx.stroke();
+        }
+      }
+    }
+
+    // Las celdas fuera de la forma del mapa quedan oscuras; las paredes se
+    // marcan con una franja para que su edicion sea visible aunque no haya arte.
+    if (level.tiles) {
+      for (const tile of level.tiles) {
+        if (tile.floor === false) {
+          diamond(tile);
+          ctx.fillStyle = '#0d1015';
+          ctx.fill();
+        }
+        if (tile.wall) {
+          const point = iso.gridToScreen(tile);
+          const x = origin.x + point.x * zoom;
+          const y = origin.y + point.y * zoom;
+          ctx.fillStyle = 'rgba(224, 90, 90, 0.32)';
+          ctx.fillRect(x - 3 * zoom, y - 10 * zoom, 6 * zoom, 10 * zoom);
         }
       }
     }
