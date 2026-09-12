@@ -96,23 +96,8 @@
       "sourceRect": { "x": 0, "y": 0, "width": 16, "height": 16 },
       "animation": "player_idle",
       "collider": { "width": 16, "height": 16 }
-    },
-    {
-      "id": "solid_obstacle_2",
-      "type": "obstacle",
-      "position": { "col": 4, "row": 5 },
-      "texture": "textures/wall.png",
-      "sourceRect": { "x": 0, "y": 0, "width": 64, "height": 64 },
-      "collider": { "width": 32, "height": 32, "solid": true }
-    },
-    {
-      "id": "pass_through_2",
-      "type": "sensor",
-      "position": { "col": 6, "row": 3 },
-      "texture": "textures/wall.png",
-      "sourceRect": { "x": 0, "y": 0, "width": 32, "height": 32 },
-      "collider": { "width": 32, "height": 32, "solid": false }
     }
+    
   ],
   "events": []
 }

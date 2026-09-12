@@ -27,15 +27,26 @@ void ZSortSystem::Flush() {
     // Se usa sortPosition y no screenPosition a proposito: screenPosition
     // incluye los offsets visuales (centrar el sprite, levantar una pared), y
     // ordenar por eso daria un orden equivocado.
+    //
+    // El piso queda FUERA de ese orden por profundidad: es el plano sobre el
+    // que se apoya todo lo demas, asi que va entero primero. Si compitiera por
+    // Y, una baldosa por delante del jugador (Y mayor) se dibujaria encima y lo
+    // taparia, que es justo lo que no puede pasar.
     std::sort(queue_.begin(), queue_.end(),
         [](const SpriteInstance& a, const SpriteInstance& b) {
+            const bool aGround = a.layer <= SpriteLayer::Ground;
+            const bool bGround = b.layer <= SpriteLayer::Ground;
+
+            if (aGround != bGround) {
+                return aGround;  // todo el piso antes que cualquier otra capa
+            }
 
             if (a.sortPosition.y != b.sortPosition.y) {
                 return a.sortPosition.y < b.sortPosition.y;
             }
 
-            // En un empate, el layer garantiza piso -> pared -> entidad sin
-            // depender del orden en que se hayan encolado.
+            // En un empate, el layer garantiza pared -> entidad sin depender
+            // del orden en que se hayan encolado.
             return a.layer < b.layer;
         });
 

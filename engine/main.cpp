@@ -385,10 +385,13 @@ int main(int argc, char *argv[])
 
         gfx.BeginFrame(RAYWHITE);
 
-        // --- Piso (layer 0) -------------------------------------------------
+        // --- Piso (SpriteLayer::Ground) --------------------------------------
         // Nada se dibuja directo: todo se ENCOLA en el ZSortSystem, que al final
         // ordena por profundidad y recien ahi dibuja. Por eso un personaje puede
         // quedar tapado por una pared que se encolo antes que el.
+        //
+        // El piso es la excepcion: el ZSortSystem lo saca del orden por
+        // profundidad y lo dibuja entero primero, asi nunca tapa a nadie.
         for (const auto& floorTile : level.floorTiles)
         {
             Vector2 screenPos = gridToScreen(
@@ -414,11 +417,11 @@ int main(int argc, char *argv[])
                         Vector2{0, 0},
                         0.0f,
                     WHITE,
-                    0});
+                    SpriteLayer::Ground});
             }
         }
 
-        // --- Paredes del perimetro (layer 1) --------------------------------
+        // --- Paredes del perimetro (SpriteLayer::Object) ---------------------
         // Se generan desde la grilla, no desde el array de entidades: son el
         // "cuarto" por defecto que encierra el nivel. Mismo recorrido de celdas
         // que la deteccion de bloqueo de mas arriba.
@@ -445,7 +448,7 @@ int main(int argc, char *argv[])
                         Vector2{0, 0},
                         0.0f,
                         WHITE,
-                        1,  // layer 1: desempata contra el piso a igual profundidad
+                        SpriteLayer::Object,  // desempata contra otros objetos a igual profundidad
 
                         // Destino cuadrado de tileWidth x tileWidth: la textura
                         // fuente es de 32px y hay que estirarla al tamano del tile.
@@ -494,7 +497,7 @@ int main(int argc, char *argv[])
                 Vector2{0, 0},
                 0.0f,
                 tint,
-                2
+                SpriteLayer::Entity
             });
             // Los colliders se encolan en este mismo recorrido para no volver a
             // iterar el vector; CollisionSystem los cruza todos contra todos

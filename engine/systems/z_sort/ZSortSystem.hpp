@@ -6,6 +6,15 @@
 
 #include "core/GraphicsDevice.hpp"
 
+// Capas de dibujo. El suelo es un caso aparte: no compite en profundidad con
+// nadie, siempre queda debajo. Paredes y entidades si se intercalan entre si
+// segun su Y en pantalla, y la capa solo los desempata a igual profundidad.
+namespace SpriteLayer {
+    constexpr int Ground = 0;  // piso: plano de fondo, nunca tapa nada
+    constexpr int Object = 1;  // paredes y props apoyados en la grilla
+    constexpr int Entity = 2;  // jugador, enemigos, objetos moviles
+}
+
 struct SpriteInstance {
     const Texture2D* texture;
     Rectangle source;
@@ -16,7 +25,7 @@ struct SpriteInstance {
     Vector2 origin;
     float rotation;
     Color tint;
-    int layer = 0;
+    int layer = SpriteLayer::Ground;
     Vector2 destinationSize = Vector2{0, 0};
 };
 
