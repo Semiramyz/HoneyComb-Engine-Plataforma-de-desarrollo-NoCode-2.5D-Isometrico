@@ -17,7 +17,7 @@
 // un bug (o un nivel malicioso) no puede escribir donde se le antoje.
 // =============================================================================
 
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs/promises');
 const fsSync = require('node:fs');
@@ -113,11 +113,22 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  // Sin el menu nativo ("File Edit View Window"): el editor dibuja su propia
+  // barra de menus, y con las dos habria dos filas de menus que no se hablan.
+  // Lo util que traia el nativo (recargar, herramientas de desarrollo) esta en
+  // el menu Ver del editor.
+  Menu.setApplicationMenu(null);
   createWindow();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+// La ventana que pidio el cambio, y no "la primera": si algun dia hay dos, las
+// herramientas se abren en la que se esta usando.
+ipcMain.handle('window:toggleDevTools', (event) => {
+  BrowserWindow.fromWebContents(event.sender)?.webContents.toggleDevTools();
 });
 
 app.on('window-all-closed', () => {

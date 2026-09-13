@@ -45,6 +45,11 @@ function parseLevel(contents: string, source: string): Level {
     events: Array.isArray(data.events) ? data.events : [],
     visuals: data.visuals,
     tiles: data.tiles,
+    // Sin estas tres, abrir un nivel con mapa y volver a guardarlo borraria
+    // sus salas y tuneles, dejando solo las celdas ya calculadas.
+    rooms: data.rooms,
+    tunnels: data.tunnels,
+    tileEdits: data.tileEdits,
   };
 }
 

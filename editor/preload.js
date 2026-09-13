@@ -35,3 +35,10 @@ contextBridge.exposeInMainWorld('honeycombProject', {
   // no la UI.
   run: (levelPath) => ipcRenderer.invoke('project:run', levelPath),
 });
+
+// Control de la ventana. Existe porque se quito el menu nativo de Electron
+// (el editor tiene su propia barra de menus), y con el se iban las
+// herramientas de desarrollo.
+contextBridge.exposeInMainWorld('honeycombWindow', {
+  toggleDevTools: () => ipcRenderer.invoke('window:toggleDevTools'),
+});

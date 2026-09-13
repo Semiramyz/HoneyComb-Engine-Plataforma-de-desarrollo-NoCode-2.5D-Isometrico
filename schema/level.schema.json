@@ -40,6 +40,21 @@
       "description": "Celdas que forman la forma irregular del mapa. Si falta, se usa una grilla rectangular con piso completo y pared perimetral.",
       "items": { "$ref": "#/definitions/mapTile" }
     },
+    "rooms": {
+      "type": "array",
+      "description": "Solo del editor: las grillas (salas) que forman el mapa del nivel. El editor las traduce, junto con 'tunnels' y 'tileEdits', a 'tiles', que es lo unico que lee el motor; por eso LevelLoader.cpp no las lee. Si falta, el nivel es una sola grilla.",
+      "items": { "$ref": "#/definitions/mapRoom" }
+    },
+    "tunnels": {
+      "type": "array",
+      "description": "Solo del editor: pasillos entre dos salas de 'rooms'. Sin 'fromSide', 'toSide' ni 'path' van en L del centro de 'from' al centro de 'to'. Las paredes van por fuera del pasillo.",
+      "items": { "$ref": "#/definitions/mapTunnel" }
+    },
+    "tileEdits": {
+      "type": "array",
+      "description": "Solo del editor: celdas retocadas a mano con Piso y Pared en un nivel con salas. Se aplican encima de lo que generan las salas y los tuneles, para no perderse al moverlas. Aca una clave ausente significa 'no cambiar', no el default de mapTile.",
+      "items": { "$ref": "#/definitions/mapTile" }
+    },
     "entities": {
       "type": "array",
       "description": "Todo lo que el diseñador coloca sobre la grilla: jugador, obstaculos, items, sensores.",
@@ -142,6 +157,48 @@
           }
         }
       }
+    },
+    "mapRoom": {
+      "type": "object",
+      "description": "Una grilla (sala) del mapa: rectangulo de celdas de piso, con pared alrededor.",
+      "required": ["id", "col", "row", "width", "height"],
+      "properties": {
+        "id": { "type": "string", "description": "Nombre unico de la sala; los tuneles se enganchan por el." },
+        "col": { "type": "integer", "minimum": 0 },
+        "row": { "type": "integer", "minimum": 0 },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "mapTunnel": {
+      "type": "object",
+      "description": "Pasillo en L entre dos salas.",
+      "required": ["id", "from", "to", "width"],
+      "properties": {
+        "id": { "type": "string" },
+        "from": { "type": "string", "description": "id de la sala de origen." },
+        "to": { "type": "string", "description": "id de la sala de destino." },
+        "width": { "type": "integer", "minimum": 1, "description": "Ancho del pasillo en celdas caminables." },
+        "fromSide": { "$ref": "#/definitions/roomSide", "description": "Lado por el que sale de 'from'. Ausente = desde su centro." },
+        "toSide": { "$ref": "#/definitions/roomSide", "description": "Lado por el que entra a 'to'. Ausente = hasta su centro." },
+        "path": {
+          "type": "array",
+          "description": "Puntos de paso trazados a mano, en orden. Entre dos puntos el pasillo va en L. Ausente = en L directa de un extremo al otro.",
+          "items": {
+            "type": "object",
+            "required": ["col", "row"],
+            "properties": {
+              "col": { "type": "integer" },
+              "row": { "type": "integer" }
+            }
+          }
+        }
+      }
+    },
+    "roomSide": {
+      "type": "string",
+      "enum": ["top", "bottom", "left", "right"],
+      "description": "Lado de una sala en los ejes de la grilla: left/right = -columna/+columna, top/bottom = -fila/+fila."
     },
     "mapTile": {
       "type": "object",

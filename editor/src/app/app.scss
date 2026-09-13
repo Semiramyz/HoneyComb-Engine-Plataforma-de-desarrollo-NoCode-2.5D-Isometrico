@@ -119,8 +119,18 @@
   }
 }
 
-/* Los "menus" del topbar (Archivo, Editar, Vista). Planos hasta que se los
-   pasa por encima, como los de Blender. */
+/* Aviso de cambios sin guardar, a la derecha del topbar. Ambar y chico: tiene
+   que verse de reojo, pero no competir con el verde de Ejecutar. */
+.topbar__dirty {
+  padding: 0 8px;
+  color: #d9a441;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* Botones sueltos del topbar (Ejecutar y los interruptores de paneles). Los
+   menus desplegables tienen su propio componente, menu-bar. Planos hasta que
+   se los pasa por encima, como los de Blender. */
 .menu {
   height: 20px;
   padding: 0 8px;
@@ -643,6 +653,69 @@
    abajo con la misma especificidad. */
 .canvas.canvas--moving {
   cursor: grabbing;
+}
+
+/* Grupo de botones que puede bajar de linea (los cuatro lados de una grilla
+   en un dialogo angosto). Separados y todos redondeados: pegados en varias
+   filas, las esquinas de .seg dejarian formas raras. */
+.seg.seg--wrap {
+  flex-wrap: wrap;
+  gap: 3px;
+
+  > * {
+    border-radius: var(--radius);
+  }
+}
+
+/* ---------- Panel Mapa: grillas y tuneles ---------- */
+.maprow__actions {
+  display: flex;
+  gap: 3px;
+}
+/* Cada grilla es un bloque: nombre con su boton de quitar, y debajo sus cuatro
+   numeros en una fila. La linea suave de abajo separa una grilla de la
+   siguiente sin llegar a ser un panel dentro del panel. */
+.maprow {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-soft);
+
+  &__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+
+  &__name {
+    overflow: hidden;
+    font-family: ui-monospace, "Cascadia Mono", monospace;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Un tunel entra en una sola linea: "de -> a", su ancho y quitar. */
+  &--inline {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+
+    .maprow__name {
+      flex: 1;
+    }
+  }
+
+  &__num {
+    width: 54px;
+  }
+}
+
+.maplist__title {
+  margin: 10px 0 2px;
+  color: var(--text-dim);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 /* ---------- Visor de archivos ---------- */

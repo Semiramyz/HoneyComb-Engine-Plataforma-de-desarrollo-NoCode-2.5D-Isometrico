@@ -1,0 +1,77 @@
+<!--
+  Barra de menus. Cada titulo abre su desplegable, y dentro puede haber
+  opciones, separadores, cosas planeadas ("Proximamente") y submenus de un nivel.
+
+  Una opcion suelta se dibuja en un solo lugar, #leaf, porque va igual en el
+  desplegable y en un submenu.
+-->
+<ng-template #leaf let-entry>
+  @if (entry.kind === 'separator') {
+    <div class="mb-sep" role="separator"></div>
+  }
+  @if (asAction(entry); as action) {
+    <button class="mb-item" type="button" role="menuitem" [disabled]="action.disabled"
+            (click)="choose(action)">
+      <span class="mb-item__check">{{ action.checked ? '✓' : '' }}</span>
+      <span class="mb-item__label">{{ action.label }}</span>
+      <span class="mb-item__shortcut">{{ action.shortcut ?? '' }}</span>
+    </button>
+  }
+  @if (asSoon(entry); as soon) {
+    <!-- El tooltip cuenta que va a hacer: es la unica forma de saberlo antes
+         de que exista. -->
+    <div class="mb-item mb-item--soon" role="menuitem" aria-disabled="true" [title]="soon.hint">
+      <span class="mb-item__check"></span>
+      <span class="mb-item__label">{{ soon.label }}</span>
+      <span class="mb-item__badge">Próximamente</span>
+    </div>
+  }
+</ng-template>
+
+@for (menu of menus(); track menu.id) {
+  <div class="mb-menu">
+    <button class="mb-title" type="button" aria-haspopup="menu"
+            [class.is-open]="openMenu() === menu.id"
+            [attr.aria-expanded]="openMenu() === menu.id"
+            (click)="toggle(menu.id)" (pointerenter)="hoverTitle(menu.id)">
+      {{ menu.label }}
+    </button>
+
+    @if (openMenu() === menu.id) {
+      <div class="mb-dropdown" role="menu">
+        @for (entry of menu.items; track $index) {
+          @if (asSubmenu(entry); as sub) {
+            <!-- El submenu se abre al pasar el mouse, y tambien con clic para
+                 quien no espera que un menu reaccione solo al hover. -->
+            <div class="mb-sub" (pointerenter)="openSubmenu.set(sub.label)">
+              <button class="mb-item" type="button" role="menuitem" aria-haspopup="menu"
+                      [class.is-open]="openSubmenu() === sub.label"
+                      [attr.aria-expanded]="openSubmenu() === sub.label"
+                      (click)="openSubmenu.set(sub.label)">
+                <span class="mb-item__check"></span>
+                <span class="mb-item__label">{{ sub.label }}</span>
+                <span class="mb-item__arrow">▸</span>
+              </button>
+
+              @if (openSubmenu() === sub.label) {
+                <div class="mb-dropdown mb-dropdown--side" role="menu">
+                  @for (child of sub.items; track $index) {
+                    <ng-container *ngTemplateOutlet="leaf; context: { $implicit: child }" />
+                  } @empty {
+                    <div class="mb-empty">{{ sub.emptyLabel }}</div>
+                  }
+                </div>
+              }
+            </div>
+          } @else {
+            <!-- Pasar por una opcion comun cierra el submenu que estuviera
+                 abierto, como en cualquier menu de escritorio. -->
+            <div (pointerenter)="openSubmenu.set(null)">
+              <ng-container *ngTemplateOutlet="leaf; context: { $implicit: entry }" />
+            </div>
+          }
+        }
+      </div>
+    }
+  </div>
+}

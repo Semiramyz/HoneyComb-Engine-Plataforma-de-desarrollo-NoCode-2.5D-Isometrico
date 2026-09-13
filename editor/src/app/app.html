@@ -29,27 +29,9 @@
       <span class="brand__name">HoneyComb</span>
     </div>
 
-    <!-- Los dos paneles laterales se esconden desde aca. Van juntos y con el
-         icono del lado que apagan, para que se lean como un par. -->
-    <button class="menu" [class.is-active]="sidebarVisible()" (click)="toggleSidebar()"
-            title="Mostrar u ocultar el panel izquierdo (Ctrl+B)">☰</button>
-    <button class="menu" [class.is-active]="inspectorVisible()" (click)="toggleInspector()"
-            title="Mostrar u ocultar el panel de propiedades">⚙</button>
-
-    <button class="menu" (click)="openLevelFile()" title="Abrir un archivo .json de nivel (Ctrl+O)">
-      Abrir nivel
-    </button>
-    <button class="menu" (click)="openProject()" title="Abrir una carpeta de proyecto">
-      Proyecto
-    </button>
-    <button class="menu" (click)="newLevel()" title="Crear un nivel nuevo">Nuevo</button>
-    <button class="menu" (click)="save()" title="Guardar (Ctrl+S)">
-      Guardar{{ dirty() ? ' *' : '' }}
-    </button>
-    <button class="menu" (click)="saveAs()" title="Elegir carpeta y nombre (Ctrl+Shift+S)">
-      Guardar como
-    </button>
-    <button class="menu" (click)="frameAll()" title="Encuadrar todo (Inicio)">Vista</button>
+    <!-- Barra de menus con desplegables (Archivo, Editar, Ver, Mapa...). Se
+         describe entera en el computed "menus" de app.ts. -->
+    <app-menu-bar [menus]="menus()" />
 
     <!-- Guarda y lanza el motor con el nivel abierto. Destacado porque es la
          accion que cierra el ciclo de trabajo: editar, probar, corregir. -->
@@ -76,6 +58,19 @@
     </nav>
 
     <div class="topbar__spacer"></div>
+
+    <!-- Aviso de cambios sin guardar. Antes iba como "Guardar *" en un boton
+         que ahora vive dentro del menu Archivo, donde no se ve de un vistazo. -->
+    @if (dirty()) {
+      <span class="topbar__dirty" title="Hay cambios sin guardar (Ctrl+S)">● Sin guardar</span>
+    }
+
+    <!-- Interruptores de los paneles laterales, a la derecha como los de
+         diseño de VS Code. Tambien estan en el menu Ver. -->
+    <button class="menu" [class.is-active]="sidebarVisible()" (click)="toggleSidebar()"
+            title="Mostrar u ocultar el panel izquierdo (Ctrl+B)">☰</button>
+    <button class="menu" [class.is-active]="inspectorVisible()" (click)="toggleInspector()"
+            title="Mostrar u ocultar el panel de propiedades">⚙</button>
 
     <select class="select-lone" [value]="levels.fileName() ?? ''" (change)="loadLevel(str($event))">
       <option value="" disabled>— nivel —</option>
@@ -229,6 +224,207 @@
 
         <div class="modal__actions">
           <button class="btn btn--primary" type="button" (click)="closeContextMenu()">Listo</button>
+        </div>
+      </section>
+    </div>
+  }
+
+  <!-- Grilla del mapa: agregar una nueva, o cambiar una que ya existe (clic
+       derecho sobre ella, o ✎ en el panel Mapa). Una nueva se puede pegar a
+       otra eligiendo de que lado va, o dejar donde se la dibujo con la
+       herramienta Grilla. La vista previa verde del viewport muestra el lugar
+       mientras se cambian los numeros. -->
+  @if (roomDraft(); as draft) {
+    <div class="modal-backdrop" (click)="cancelRoomDialog()">
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="room-dialog-title"
+               (click)="$event.stopPropagation()">
+        <div class="modal__head">
+          <h2 id="room-dialog-title">{{ draft.editId ? 'Grilla “' + draft.editId + '”' : 'Agregar grilla al mapa' }}</h2>
+          <button class="icon-button" type="button" title="Cerrar" (click)="cancelRoomDialog()">×</button>
+        </div>
+
+        <div class="modal__body">
+          @if (!draft.editId && rooms().length === 0) {
+            <p class="hint">
+              El nivel todavía es una sola grilla. Al agregar esta, el área actual pasa a llamarse
+              “sala_1” y se puede unir con la nueva.
+            </p>
+          }
+
+          @if (!draft.editId) {
+            <label class="field">
+              <span>Nombre</span>
+              <input class="input" [value]="draft.id" (input)="patchRoomDraft({ id: str($event) })" />
+            </label>
+          }
+
+          <label class="field">
+            <span>Ubicar junto a</span>
+            <select class="input" [value]="draft.anchor" (change)="setRoomAnchor(str($event))">
+              <option value="">— posición libre —</option>
+              @for (room of anchorRooms(); track room.id) {
+                <option [value]="room.id">{{ room.id }}</option>
+              }
+            </select>
+          </label>
+
+          @if (draft.anchor) {
+            <div class="field">
+              <span>De qué lado</span>
+              <div class="seg seg--wrap">
+                @for (side of roomSides; track side.value) {
+                  <button class="tool" type="button" [class.is-active]="draft.side === side.value"
+                          [title]="side.hint" (click)="setRoomSide(side.value)">{{ side.label }}</button>
+                }
+              </div>
+            </div>
+          }
+
+          <!-- Escribir columna o fila suelta la grilla de la de al lado; el
+               tamano, en cambio, la mantiene pegada. Ver patchRoomPosition. -->
+          <div class="field-row">
+            <label class="field">
+              <span>Columna</span>
+              <input class="input" type="number" step="1" [value]="draft.col"
+                     (input)="patchRoomPosition({ col: int($event) })" />
+            </label>
+            <label class="field">
+              <span>Fila</span>
+              <input class="input" type="number" step="1" [value]="draft.row"
+                     (input)="patchRoomPosition({ row: int($event) })" />
+            </label>
+          </div>
+
+          <div class="field-row">
+            <label class="field">
+              <span>Ancho</span>
+              <input class="input" type="number" min="1" step="1" [value]="draft.width"
+                     (input)="patchRoomSize({ width: int($event) })" />
+            </label>
+            <label class="field">
+              <span>Alto</span>
+              <input class="input" type="number" min="1" step="1" [value]="draft.height"
+                     (input)="patchRoomSize({ height: int($event) })" />
+            </label>
+          </div>
+
+          @if (!draft.editId) {
+            <label class="field">
+              <span>Conectar con</span>
+              <select class="input" [value]="draft.connectTo" (change)="patchRoomDraft({ connectTo: str($event) })">
+                <option value="">— sin túnel —</option>
+                @for (room of connectableRooms(); track room.id) {
+                  <option [value]="room.id">{{ room.id }}</option>
+                }
+              </select>
+            </label>
+
+            @if (draft.connectTo) {
+              <label class="field">
+                <span>Ancho del túnel (celdas)</span>
+                <input class="input" type="number" min="1" step="1" [value]="draft.tunnelWidth"
+                       (input)="patchRoomDraft({ tunnelWidth: int($event) })" />
+              </label>
+            }
+          }
+
+          <p class="hint">
+            El recuadro verde del viewport muestra dónde va a quedar. Si cae a la izquierda o arriba del
+            mapa, el mapa entero se corre para hacerle lugar.
+          </p>
+        </div>
+
+        <div class="modal__actions">
+          <button class="btn" type="button" (click)="cancelRoomDialog()">Cancelar</button>
+          <button class="btn btn--primary" type="button" (click)="confirmRoomDialog()">
+            {{ draft.editId ? 'Guardar' : 'Agregar grilla' }}
+          </button>
+        </div>
+      </section>
+    </div>
+  }
+
+  <!-- Menu del tunel: nuevo, recien trazado a mano, o uno existente (clic
+       derecho sobre el, o ✎ en el panel Mapa). Los lados deciden por donde
+       sale y entra; el trazado, por donde pasa. -->
+  @if (tunnelDraft(); as draft) {
+    <div class="modal-backdrop" (click)="cancelTunnelDialog()">
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="tunnel-dialog-title"
+               (click)="$event.stopPropagation()">
+        <div class="modal__head">
+          <h2 id="tunnel-dialog-title">
+            {{ draft.editId ? 'Túnel “' + draft.editId + '”' : 'Conectar grillas con un túnel' }}
+          </h2>
+          <button class="icon-button" type="button" title="Cerrar" (click)="cancelTunnelDialog()">×</button>
+        </div>
+
+        <div class="modal__body">
+          <div class="field-row">
+            <label class="field">
+              <span>Desde</span>
+              <select class="input" [value]="draft.from" (change)="patchTunnelDraft({ from: str($event) })">
+                @for (room of rooms(); track room.id) {
+                  <option [value]="room.id">{{ room.id }}</option>
+                }
+              </select>
+            </label>
+            <label class="field">
+              <span>Hasta</span>
+              <select class="input" [value]="draft.to" (change)="patchTunnelDraft({ to: str($event) })">
+                @for (room of rooms(); track room.id) {
+                  <option [value]="room.id">{{ room.id }}</option>
+                }
+              </select>
+            </label>
+          </div>
+
+          <div class="field-row">
+            <label class="field">
+              <span>Sale por</span>
+              <select class="input" [value]="draft.fromSide" (change)="patchTunnelDraft({ fromSide: sideValue($event) })">
+                <option value="">Automático (centro)</option>
+                @for (side of roomSides; track side.value) {
+                  <option [value]="side.value">{{ side.label }}</option>
+                }
+              </select>
+            </label>
+            <label class="field">
+              <span>Entra por</span>
+              <select class="input" [value]="draft.toSide" (change)="patchTunnelDraft({ toSide: sideValue($event) })">
+                <option value="">Automático (centro)</option>
+                @for (side of roomSides; track side.value) {
+                  <option [value]="side.value">{{ side.label }}</option>
+                }
+              </select>
+            </label>
+          </div>
+
+          <label class="field">
+            <span>Ancho (celdas caminables)</span>
+            <input class="input" type="number" min="1" step="1" [value]="draft.width"
+                   (input)="patchTunnelDraft({ width: int($event) })" />
+          </label>
+
+          <div class="field">
+            <span>Trazado</span>
+            @if (draft.path.length > 0) {
+              <p class="hint">A mano, pasando por {{ draft.path.length }} puntos marcados.</p>
+            } @else {
+              <p class="hint">Automático: tramos rectos entre sus dos extremos.</p>
+            }
+            <div class="field-row">
+              <button class="btn" style="flex: 1" type="button" (click)="retraceTunnel()">Trazar a mano…</button>
+              <button class="btn" style="flex: 1" type="button" [disabled]="draft.path.length === 0"
+                      (click)="patchTunnelDraft({ path: [] })">Volver a automático</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal__actions">
+          <button class="btn" type="button" (click)="cancelTunnelDialog()">Cancelar</button>
+          <button class="btn btn--primary" type="button" (click)="confirmTunnelDialog()">
+            {{ draft.editId ? 'Guardar' : 'Conectar' }}
+          </button>
         </div>
       </section>
     </div>
@@ -480,6 +676,10 @@
                   title="Alternar piso: una celda sin suelo no se puede pisar">▱</button>
           <button class="tool" [class.is-active]="tool() === 'wall'" (click)="setTool('wall')"
                   title="Alternar pared: bloquea el paso en esa celda">▥</button>
+          <button class="tool" [class.is-active]="tool() === 'room'" (click)="setTool('room')"
+                  title="Grilla: arrastrá sobre el vacío para dibujar una nueva, o dentro de una para moverla">▢</button>
+          <button class="tool" [class.is-active]="tool() === 'tunnel'" (click)="setTool('tunnel')"
+                  title="Túnel: trazalo a mano, de una grilla a otra">⤳</button>
         </div>
 
         <span class="head__sep"></span>
@@ -550,6 +750,9 @@
           }
           @if (selectionCount() > 1) {
             <span>{{ selectionCount() }} seleccionadas</span>
+          }
+          @if (tunnelTrace(); as trace) {
+            <span>túnel desde {{ trace.from }} · {{ trace.points.length }} puntos · Retroceso deshace · Escape cancela</span>
           }
         </div>
       </div>
@@ -799,6 +1002,96 @@
               }
             </section>
 
+            <!-- Grillas y tuneles del mapa. Los numeros usan (change) y no
+                 (input): cada cambio recalcula el mapa entero, y hacerlo con
+                 cada tecla dibujaria salas de tamaños intermedios sin sentido
+                 mientras se escribe un "12". -->
+            <section class="panel">
+              <button class="panel__head" (click)="togglePanel('map')">
+                <span class="panel__arrow" [class.panel__arrow--collapsed]="isCollapsed('map')">▶</span>
+                Mapa
+              </button>
+              @if (!isCollapsed('map')) {
+                <div class="panel__body">
+                  @if (rooms().length === 0) {
+                    <p class="hint">
+                      El nivel es una sola grilla. Agregá otra para armar salas unidas por túneles.
+                    </p>
+                  }
+
+                  @for (room of rooms(); track room.id) {
+                    <div class="maprow">
+                      <div class="maprow__head">
+                        <span class="maprow__name">▦ {{ room.id }}</span>
+                        <span class="maprow__actions">
+                          <button class="btn btn--small" type="button" title="Configurar la grilla"
+                                  (click)="editRoom(room.id)">✎</button>
+                          <button class="btn btn--small btn--danger" type="button"
+                                  title="Quitar la grilla y sus túneles" (click)="removeRoom(room.id)">×</button>
+                        </span>
+                      </div>
+                      <div class="field-row">
+                        <label class="field">
+                          <span>Col</span>
+                          <input class="input" type="number" step="1" [value]="room.col"
+                                 (change)="updateRoom(room.id, { col: int($event) })" />
+                        </label>
+                        <label class="field">
+                          <span>Fila</span>
+                          <input class="input" type="number" step="1" [value]="room.row"
+                                 (change)="updateRoom(room.id, { row: int($event) })" />
+                        </label>
+                        <label class="field">
+                          <span>Ancho</span>
+                          <input class="input" type="number" min="1" step="1" [value]="room.width"
+                                 (change)="updateRoom(room.id, { width: int($event) })" />
+                        </label>
+                        <label class="field">
+                          <span>Alto</span>
+                          <input class="input" type="number" min="1" step="1" [value]="room.height"
+                                 (change)="updateRoom(room.id, { height: int($event) })" />
+                        </label>
+                      </div>
+                    </div>
+                  }
+
+                  @if (tunnels().length > 0) {
+                    <div class="maplist__title">Túneles</div>
+                    @for (tunnel of tunnels(); track tunnel.id) {
+                      <div class="maprow maprow--inline">
+                        <span class="maprow__name"
+                              [title]="tunnel.path?.length ? 'Trazado a mano' : 'Trazado automático'">
+                          {{ tunnel.from }} → {{ tunnel.to }}{{ tunnel.path?.length ? ' · a mano' : '' }}
+                        </span>
+                        <input class="input maprow__num" type="number" min="1" step="1" [value]="tunnel.width"
+                               title="Ancho en celdas caminables" (change)="updateTunnel(tunnel.id, int($event))" />
+                        <button class="btn btn--small" type="button" title="Configurar: lados, trazado y ancho"
+                                (click)="editTunnel(tunnel.id)">✎</button>
+                        <button class="btn btn--small btn--danger" type="button" title="Quitar el túnel"
+                                (click)="removeTunnel(tunnel.id)">×</button>
+                      </div>
+                    }
+                  }
+
+                  <div class="field-row" style="margin-top: 8px">
+                    <button class="btn" style="flex: 1" type="button" (click)="openRoomDialog()">+ Grilla</button>
+                    <button class="btn" style="flex: 1" type="button" [disabled]="rooms().length < 2"
+                            (click)="openTunnelDialog()">+ Túnel</button>
+                  </div>
+
+                  @if (tileEditCount() > 0) {
+                    <p class="hint" style="margin-top: 8px">
+                      {{ tileEditCount() }} celdas retocadas a mano con Piso/Pared se aplican encima de las
+                      grillas.
+                    </p>
+                    <button class="btn btn--small" type="button" (click)="clearTileEdits()">
+                      Descartar retoques
+                    </button>
+                  }
+                </div>
+              }
+            </section>
+
             <section class="panel">
               <button class="panel__head" (click)="togglePanel('project')">
                 <span class="panel__arrow" [class.panel__arrow--collapsed]="isCollapsed('project')">▶</span>
@@ -1001,7 +1294,7 @@
     <span class="keyhint"><b>Derecho / Medio</b> Desplazar</span>
     <span class="keyhint"><b>Shift+clic</b> Sumar</span>
     <span class="keyhint"><b>Ctrl+arrastrar</b> Mover</span>
-    <span class="keyhint"><b>Clic derecho</b> Tamaño</span>
+    <span class="keyhint"><b>Clic derecho</b> Configurar</span>
     <span class="keyhint"><b>Shift+D</b> Duplicar</span>
     <span class="keyhint"><b>X</b> Eliminar</span>
     <span class="keyhint"><b>Ctrl+B</b> Barra lateral</span>

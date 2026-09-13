@@ -70,6 +70,41 @@ export interface MapTile {
   wall?: boolean;
 }
 
+/**
+ * Una grilla (sala) del mapa del nivel. Solo la usa el editor: se traduce a
+ * "tiles", que es lo que lee el motor (ver core/dungeon-layout.ts).
+ */
+export interface MapRoom {
+  /** Nombre unico; los tuneles se enganchan por el. */
+  id: string;
+  col: number;
+  row: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Lado de una sala, en los ejes de la GRILLA: left/right son -columna/+columna,
+ * top/bottom son -fila/+fila. En la pantalla isometrica eso se ve en diagonal
+ * (+columna va abajo a la derecha), y por eso el editor los muestra con flechas.
+ */
+export type RoomSide = 'top' | 'bottom' | 'left' | 'right';
+
+/** Pasillo entre dos salas. Solo del editor, igual que MapRoom. */
+export interface MapTunnel {
+  id: string;
+  from: string;
+  to: string;
+  /** Ancho en celdas caminables; las paredes van por fuera. */
+  width: number;
+  /** Lado por el que sale de "from". Ausente = desde el centro de la sala. */
+  fromSide?: RoomSide;
+  /** Lado por el que entra a "to". Ausente = hasta el centro de la sala. */
+  toSide?: RoomSide;
+  /** Puntos de paso trazados a mano, en orden. Ausente = en L automatica. */
+  path?: GridPosition[];
+}
+
 /** Un paso individual (trigger, condicion o accion). 'type' referencia un ID de event_catalog.json. */
 export interface EventStep {
   type: string;
@@ -92,4 +127,12 @@ export interface Level {
     wall?: { texture: string; sourceRect: SourceRect };
   };
   tiles?: MapTile[];
+  /** Grillas del mapa. Ausente = el nivel es una sola grilla, como siempre. */
+  rooms?: MapRoom[];
+  tunnels?: MapTunnel[];
+  /**
+   * Celdas retocadas a mano con Piso/Pared en un nivel con salas. Se aplican
+   * encima de lo que generan las salas, para no perderse al moverlas.
+   */
+  tileEdits?: MapTile[];
 }

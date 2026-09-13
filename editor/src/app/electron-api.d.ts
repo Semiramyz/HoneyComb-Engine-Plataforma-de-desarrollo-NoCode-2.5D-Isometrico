@@ -68,8 +68,14 @@ export interface HoneycombProjectApi {
   run(levelPath: string): Promise<{ ok: boolean; executable?: string; error?: string }>;
 }
 
+/** Control de la ventana, para lo que antes daba el menu nativo de Electron. */
+export interface HoneycombWindowApi {
+  toggleDevTools(): Promise<void>;
+}
+
 declare global {
   interface Window {
     honeycombProject: HoneycombProjectApi;
+    honeycombWindow: HoneycombWindowApi;
   }
 }
