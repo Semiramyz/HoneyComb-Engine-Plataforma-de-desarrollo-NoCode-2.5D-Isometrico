@@ -12,6 +12,12 @@ export interface HoneycombProjectApi {
   writeFile(relativePath: string, contents: string): Promise<void>;
   /** Lista los nombres de archivo (no subcarpetas) dentro de una carpeta relativa a la raiz del proyecto. */
   listDir(relativeDir: string): Promise<string[]>;
+
+  /**
+   * Lanza el runtime con el nivel de esa ruta absoluta. El ejecutable lo
+   * localiza el proceso principal a partir de ella.
+   */
+  run(levelPath: string): Promise<{ ok: boolean; executable?: string; error?: string }>;
 }
 
 declare global {

@@ -46,7 +46,18 @@ export class LevelService {
   }
 
   async load(fileName: string): Promise<void> {
-    const level = await this.project.readLevel(fileName);
+    this.adopt(await this.project.readLevel(fileName), fileName);
+  }
+
+  /**
+   * Toma un nivel YA leido y lo pone como el nivel abierto. Lo usa el "Abrir
+   * nivel" del dialogo del sistema, donde el archivo puede estar en cualquier
+   * parte y no necesariamente dentro de levels/ del proyecto.
+   *
+   * fileName en null significa "este nivel no vive en el proyecto abierto":
+   * el desplegable de niveles no lo muestra y guardar va a preguntar donde.
+   */
+  adopt(level: Level, fileName: string | null): void {
     this.level.set(level);
     this.fileName.set(fileName);
     this.selectedEntityId.set(null);

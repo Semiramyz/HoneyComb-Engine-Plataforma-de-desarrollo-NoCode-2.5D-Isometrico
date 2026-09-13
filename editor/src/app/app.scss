@@ -134,6 +134,21 @@
   &:hover {
     background: var(--widget);
   }
+
+  /* Ejecutar: el unico boton del topbar con color propio. Es la accion que
+     saca el nivel del editor y lo pone a correr, y conviene encontrarla sin
+     leer. Verde y no el azul de acento, que en este tema significa
+     "seleccionado" y no "ejecutar". */
+  &--run {
+    margin-left: 6px;
+    background: #3f6b32;
+    color: #e8f5e2;
+    font-weight: 500;
+
+    &:hover {
+      background: #4d8340;
+    }
+  }
 }
 
 /* Pestanas de workspace. Van pegadas al borde inferior del topbar y la activa
@@ -550,6 +565,62 @@
 
   &__active {
     color: rgba(255, 255, 255, 0.85);
+  }
+}
+
+/* Menu contextual del click derecho. Flota sobre el canvas, posicionado en el
+   punto donde se hizo click (las coordenadas las pone la plantilla).
+
+   A diferencia de los overlays informativos de abajo, este SI recibe clicks:
+   es el unico elemento sobre el canvas con el que se interactua. */
+.ctxmenu {
+  position: absolute;
+  z-index: 5;
+  min-width: 170px;
+  padding: 4px;
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
+
+  &__title {
+    padding: 3px 8px 5px;
+    color: var(--text-dim);
+    font-family: ui-monospace, "Cascadia Mono", monospace;
+    font-size: 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 4px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--accent);
+      color: var(--text-bright);
+    }
+
+    input {
+      accent-color: var(--accent);
+      margin: 0;
+    }
+
+    /* La aclaracion de que hace cada opcion, a la derecha y atenuada: son dos
+       palabras que evitan tener que probar cual era cual. */
+    em {
+      margin-left: auto;
+      color: var(--text-dim);
+      font-size: 10px;
+      font-style: normal;
+    }
+    &:hover em {
+      color: #d6e2f5;
+    }
   }
 }
 

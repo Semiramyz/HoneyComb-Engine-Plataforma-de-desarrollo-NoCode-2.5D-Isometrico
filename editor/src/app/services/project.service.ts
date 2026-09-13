@@ -3,6 +3,50 @@ import { Injectable, signal } from '@angular/core';
 import { EventCatalog } from '../models/event-catalog.model';
 import { Level } from '../models/level.model';
 
+/**
+ * Convierte el texto de un archivo en un Level utilizable, o falla con un
+ * mensaje que se entienda.
+ *
+ * Existe porque abrir un archivo es el unico lugar donde entra al editor algo
+ * que nadie valido: puede ser un JSON roto, o uno valido que no sea un nivel.
+ * Sin este control, un archivo cualquiera dejaba la pantalla en blanco al
+ * dibujar (draw() lee level.grid.tileWidth sin preguntar).
+ *
+ * Lo obligatorio es la grilla, que es de lo unico que no se puede inventar un
+ * default razonable. El resto se completa: un nivel sin entidades o sin
+ * eventos es perfectamente valido, solo que esta vacio.
+ */
+function parseLevel(contents: string, source: string): Level {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(contents);
+  } catch {
+    throw new Error(`"${source}" no es un JSON valido.`);
+  }
+
+  const data = raw as Partial<Level>;
+  const grid = data?.grid;
+  const isNumber = (value: unknown) => typeof value === 'number' && Number.isFinite(value);
+  if (
+    !grid ||
+    !isNumber(grid.width) ||
+    !isNumber(grid.height) ||
+    !isNumber(grid.tileWidth) ||
+    !isNumber(grid.tileHeight)
+  ) {
+    throw new Error(`"${source}" no parece un nivel de HoneyComb: le falta "grid".`);
+  }
+
+  return {
+    name: typeof data.name === 'string' ? data.name : 'nivel',
+    grid,
+    entities: Array.isArray(data.entities) ? data.entities : [],
+    events: Array.isArray(data.events) ? data.events : [],
+    visuals: data.visuals,
+    tiles: data.tiles,
+  };
+}
+
 // Unico punto de contacto entre Angular y la API de proyecto que expone
 // preload.js. Ningun componente debe llamar window.honeycombProject
 // directamente -- todo pasa por aca, para que el resto del editor trabaje
@@ -36,7 +80,23 @@ export class ProjectService {
 
   async readLevel(fileName: string): Promise<Level> {
     const contents = await window.honeycombProject.readFile(`levels/${fileName}`);
-    return JSON.parse(contents) as Level;
+    return parseLevel(contents, fileName);
+  }
+
+  /**
+   * Abre un nivel eligiendo el ARCHIVO con el dialogo del sistema, en vez de
+   * elegirlo del desplegable del proyecto.
+   *
+   * Sirve para abrir un .json que este en cualquier parte, tenga o no un
+   * proyecto abierto. Devuelve la ruta elegida junto al nivel, o null si se
+   * cancelo.
+   */
+  async openLevelFile(): Promise<{ path: string; level: Level } | null> {
+    const result = await window.honeycombProject.open();
+    if (result.canceled || !result.filePath || result.contents === undefined) {
+      return null;
+    }
+    return { path: result.filePath, level: parseLevel(result.contents, result.filePath) };
   }
 
   // Indentado a 2 espacios y no minificado: el JSON del nivel se versiona en
@@ -65,6 +125,17 @@ export class ProjectService {
   async readEventCatalog(): Promise<EventCatalog> {
     const contents = await window.honeycombProject.readFile('schema/event_catalog.json');
     return JSON.parse(contents) as EventCatalog;
+  }
+
+  /**
+   * Lanza el runtime con un nivel ya guardado en disco.
+   *
+   * Se le pasa la ruta del NIVEL, no la del motor: el proceso principal deduce
+   * de ella donde esta engine.exe, con la misma convencion de carpetas que usa
+   * el propio motor para encontrar los assets.
+   */
+  async runLevel(levelPath: string): Promise<{ ok: boolean; executable?: string; error?: string }> {
+    return window.honeycombProject.run(levelPath);
   }
 
   /** Imagenes de assets/textures/, que son las que aparecen en el panel Recursos. */

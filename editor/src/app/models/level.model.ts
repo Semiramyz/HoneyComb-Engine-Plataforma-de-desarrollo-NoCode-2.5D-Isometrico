@@ -26,11 +26,12 @@ export interface SourceRect {
 export interface ColliderConfig {
   width: number;
   height: number;
-  // FALTA: el schema y LevelLoader.cpp tienen tambien "solid" (bool, default
-  // false): true bloquea el movimiento, false lo deja pasar como sensor. Al no
-  // estar declarado aca, el editor no lo muestra ni lo conserva -- si se abre
-  // y se vuelve a guardar un nivel que lo usa (como levels/test_level.json),
-  // el campo se pierde y los obstaculos dejan de frenar al jugador.
+  /**
+   * true = la entidad BLOQUEA el movimiento (una pared). false o ausente = la
+   * atraviesan, pero sigue detectando el contacto y disparando on_collision
+   * (un sensor). Es el mismo campo que ya leia LevelLoader.cpp.
+   */
+  solid?: boolean;
 }
 
 export interface LevelEntity {

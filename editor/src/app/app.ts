@@ -90,6 +90,14 @@ const ZOOM_MAX = 16;
 /** Factor por muesca de rueda. ~1.15 da la misma sensacion de "arrastre" que Blender. */
 const ZOOM_WHEEL_FACTOR = 1.15;
 
+/**
+ * Pixeles que puede moverse el cursor entre apretar y soltar sin dejar de
+ * contar como un click. Separa "click derecho" (abre el menu) de "arrastre con
+ * el derecho" (mueve la camara); con 0 el menu no abriria nunca, porque un
+ * mouse siempre se corre uno o dos pixeles al hacer click.
+ */
+const CLICK_SLOP = 4;
+
 /** Margen superior del encuadre por defecto, en pixeles de canvas. */
 const VIEW_TOP_MARGIN = 60;
 /** Proporcion del viewport que ocupa la grilla al encuadrarla con Inicio. */
@@ -216,6 +224,19 @@ export class App {
   readonly panning = signal(false);
   /** Punto donde empezo el arrastre + pan que habia entonces, para calcular el delta. */
   private dragOrigin = { x: 0, y: 0, panX: 0, panY: 0 };
+  /** Boton que inicio el gesto en curso, para saber al soltar que hacer con el. */
+  private pressedButton: number | null = null;
+
+  /**
+   * Menu contextual abierto: sobre que entidad, y donde ponerlo (en pixeles
+   * relativos al contenedor del canvas). Null cuando no hay ninguno.
+   */
+  readonly contextMenu = signal<{ id: string; x: number; y: number } | null>(null);
+  /** La entidad del menu abierto, resuelta; undefined si se borro mientras tanto. */
+  readonly contextMenuEntity = computed(() => {
+    const menu = this.contextMenu();
+    return menu ? this.entities().find((entity) => entity.id === menu.id) : undefined;
+  });
 
   // --- Vistas derivadas del nivel abierto -----------------------------------
   // computed() y no getters: asi Angular sabe exactamente de que dependen y
@@ -308,6 +329,37 @@ export class App {
       this.note('Catalogo de eventos cargado (' + total + ' bloques).');
     } catch {
       this.note('No se encontro schema/event_catalog.json: el panel de eventos queda vacio.');
+    }
+  }
+
+  /**
+   * Abre un nivel eligiendo el archivo con el dialogo del sistema.
+   *
+   * A diferencia del desplegable de niveles, esto no exige tener un proyecto
+   * abierto ni que el archivo viva en levels/: se puede abrir un .json de
+   * donde sea y verlo dibujado.
+   */
+  async openLevelFile(): Promise<void> {
+    if (!this.hasFileSystem) {
+      this.note('Sin acceso a disco. Abre el editor con "npm run electron".');
+      return;
+    }
+    try {
+      const opened = await this.project.openLevelFile();
+      if (!opened) {
+        return; // el usuario cancelo el dialogo
+      }
+
+      // Si resulta estar dentro de levels/ del proyecto abierto, se adopta con
+      // su nombre: aparece en el desplegable y guardar no vuelve a preguntar.
+      const inLevels = this.levelsFolderFile(opened.path);
+      this.levels.adopt(opened.level, inLevels);
+      this.lastSavedPath.set(opened.path);
+      this.dirty.set(false);
+      this.frameAll();
+      this.note('Abierto ' + opened.path + ' (' + this.entities().length + ' entidades).');
+    } catch (error) {
+      this.note('No se pudo abrir: ' + this.describe(error));
     }
   }
 
@@ -528,6 +580,58 @@ export class App {
     this.collapsedPanels.update((state) => ({ ...state, [id]: !state[id] }));
   }
 
+  // --- Ejecutar en el runtime -----------------------------------------------
+
+  /**
+   * Ruta absoluta del archivo del nivel abierto, o null si todavia no se
+   * guardo en ningun lado.
+   *
+   * Hay dos formas de saberla: si el nivel vive en el proyecto, se arma con la
+   * raiz mas levels/<archivo>; si se abrio o guardo con el dialogo del
+   * sistema, es la ruta que quedo de ahi.
+   */
+  private currentLevelPath(): string | null {
+    const root = this.project.projectRoot();
+    const fileName = this.levels.fileName();
+    if (root && fileName) {
+      return root.replace(/[\\/]$/, '') + '/levels/' + fileName;
+    }
+    return this.lastSavedPath();
+  }
+
+  /**
+   * Lanza el motor con el nivel abierto: el equivalente a correr a mano
+   * engine\build\engine.exe con la ruta del nivel.
+   *
+   * Guarda antes de lanzar. No es una comodidad: el motor lee el nivel del
+   * DISCO, asi que sin guardar correria la version anterior y uno estaria
+   * probando algo distinto de lo que tiene en pantalla.
+   */
+  async run(): Promise<void> {
+    if (!this.hasFileSystem) {
+      this.note('Sin acceso a disco. Abre el editor con "npm run electron".');
+      return;
+    }
+
+    if (this.dirty() || !this.currentLevelPath()) {
+      await this.save(); // puede abrir el dialogo si el nivel es nuevo
+    }
+
+    const levelPath = this.currentLevelPath();
+    // Si sigue sin ruta o con cambios, el guardado se cancelo.
+    if (!levelPath || this.dirty()) {
+      this.note('Guarda el nivel antes de ejecutarlo.');
+      return;
+    }
+
+    const result = await this.project.runLevel(levelPath);
+    this.note(
+      result.ok
+        ? 'Ejecutando ' + levelPath
+        : result.error ?? 'No se pudo ejecutar el motor.',
+    );
+  }
+
   // --- Viewport -------------------------------------------------------------
 
   setZoom(step: number): void {
@@ -642,10 +746,28 @@ export class App {
       return;
     }
 
+    // Escape cierra el menu contextual antes que nada, para poder salir de el
+    // sin tener que clickear en otro lado.
+    if (event.key === 'Escape' && this.contextMenu()) {
+      this.closeContextMenu();
+      return;
+    }
+
     if (event.ctrlKey && event.key.toLowerCase() === 's') {
       event.preventDefault();
       // Ctrl+Shift+S fuerza el dialogo aunque ya se sepa donde va el archivo.
       void (event.shiftKey ? this.saveAs() : this.save());
+      return;
+    }
+    if (event.ctrlKey && event.key.toLowerCase() === 'o') {
+      event.preventDefault();
+      void this.openLevelFile();
+      return;
+    }
+    // F5: probar el nivel, como en cualquier entorno de desarrollo.
+    if (event.key === 'F5') {
+      event.preventDefault();
+      void this.run();
       return;
     }
     if (event.key === 'Home') {
@@ -677,6 +799,11 @@ export class App {
     // shift-arrastre (para cuando el derecho ya esta ocupado).
     if (event.button === 1 || event.button === 2 || event.shiftKey) {
       this.panning.set(true);
+      // Un click derecho puede terminar en dos cosas distintas segun si el
+      // cursor se movio o no: arrastrar la camara, o abrir el menu de la
+      // entidad. Se guarda el boton para decidirlo recien al soltar.
+      this.pressedButton = event.button;
+      this.contextMenu.set(null);
       const pan = this.pan();
       this.dragOrigin = { x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y };
       // Con captura, el arrastre sigue funcionando aunque el cursor se vaya
@@ -690,6 +817,9 @@ export class App {
     if (event.button !== 0) {
       return;
     }
+    // Cualquier click izquierdo cierra el menu abierto, como en cualquier
+    // programa: el menu no debe sobrevivir a la siguiente accion.
+    this.contextMenu.set(null);
 
     const activeTool = this.tool();
     if (activeTool === 'place') {
@@ -722,7 +852,96 @@ export class App {
     if (this.panning()) {
       this.panning.set(false);
       (event.target as HTMLElement).releasePointerCapture(event.pointerId);
+
+      // Boton derecho SIN arrastre = click derecho: abre el menu de la entidad
+      // que este debajo. El umbral es lo que separa las dos acciones; sin el,
+      // el menu aparecería al final de cada paneo, que es exactamente lo que
+      // arruina el gesto de arrastrar con el derecho.
+      const moved =
+        Math.abs(event.clientX - this.dragOrigin.x) +
+        Math.abs(event.clientY - this.dragOrigin.y);
+      if (this.pressedButton === 2 && moved <= CLICK_SLOP) {
+        this.openContextMenu(event);
+      }
     }
+    this.pressedButton = null;
+  }
+
+  /**
+   * Abre el menu contextual sobre la entidad que este bajo el cursor. Sobre
+   * espacio vacio no abre nada: un menu sin destino solo estorba.
+   */
+  private openContextMenu(event: PointerEvent): void {
+    const id = this.entityAt(event);
+    if (!id) {
+      this.contextMenu.set(null);
+      return;
+    }
+    const ref = this.viewport();
+    if (!ref) {
+      return;
+    }
+    // Coordenadas relativas al contenedor del canvas, que es contra quien se
+    // posiciona el menu (position: absolute dentro de .canvas-host).
+    const rect = ref.nativeElement.getBoundingClientRect();
+    this.selectEntity(id);
+    this.contextMenu.set({
+      id,
+      x: event.clientX - rect.left,
+      y: event.clientY - rect.top,
+    });
+  }
+
+  closeContextMenu(): void {
+    this.contextMenu.set(null);
+  }
+
+  // --- Entidad o pared ------------------------------------------------------
+  //
+  // Las dos opciones del menu son las dos caras del MISMO campo del contrato:
+  // collider.solid (ver schema/level.schema.json). No hizo falta inventar nada
+  // nuevo -- el schema ya lo declaraba y el motor ya bloqueaba con el; lo unico
+  // que faltaba era que el editor lo dejara tocar.
+  //
+  //   Pared   -> collider.solid = true   el motor frena al jugador contra ella
+  //   Entidad -> collider.solid = false  se la atraviesa; el contacto se sigue
+  //                                      detectando y dispara on_collision
+
+  /** true si la entidad bloquea el paso. */
+  isWall(entity: LevelEntity): boolean {
+    return entity.collider?.solid === true;
+  }
+
+  /**
+   * Convierte una entidad en pared o en entidad atravesable.
+   *
+   * Al hacerla pared se le crea el collider si no tenia: sin caja no hay con
+   * que chocar. Se dimensiona a UNA CELDA para las figuras, porque su huella es
+   * la casilla; para el resto, al tamano de su sprite.
+   *
+   * Al volverla entidad se conserva el collider y solo se apaga "solid": asi
+   * los eventos de contacto que ya estuvieran configurados siguen andando.
+   */
+  setWall(id: string, wall: boolean): void {
+    const entity = this.entities().find((candidate) => candidate.id === id);
+    if (!entity) {
+      return;
+    }
+
+    const grid = this.grid();
+    const isShape = shapeOf(entity) !== undefined;
+    const collider = entity.collider ?? {
+      width: isShape ? grid.tileWidth : entity.sourceRect.width,
+      height: isShape ? grid.tileHeight : entity.sourceRect.height,
+    };
+
+    this.levels.updateEntity(id, {
+      // solid se omite cuando es false: es el default del schema, y asi no
+      // ensucia el JSON de todo lo que no es pared.
+      collider: { ...collider, solid: wall ? true : undefined },
+    });
+    this.dirty.set(true);
+    this.note('"' + id + '" ahora es ' + (wall ? 'pared: bloquea el paso.' : 'entidad: se atraviesa.'));
   }
 
   /**
@@ -944,7 +1163,15 @@ export class App {
     }
     this.patchEntity({
       collider: enabled
-        ? { width: entity.sourceRect.width, height: entity.sourceRect.height }
+        ? {
+            width: entity.sourceRect.width,
+            height: entity.sourceRect.height,
+            // Se conserva si la entidad ya era pared: antes esta rama
+            // reconstruia el objeto de cero y apagaba "solid" en silencio, asi
+            // que apagar y volver a encender el collider convertia una pared
+            // en algo atravesable sin que nada lo dijera.
+            solid: entity.collider?.solid,
+          }
         : undefined,
     });
   }
@@ -1440,12 +1667,19 @@ export class App {
         ctx.strokeRect(box.x + 0.5, box.y + 0.5, box.w - 1, box.h - 1);
       }
 
-      // Collider en verde punteado: se ve que es una caja logica y no arte.
-      // Va en el punto de la celda y no en la caja del sprite, porque es ahi
-      // donde lo encola el motor (ver el Submit a CollisionSystem en main.cpp).
+      // Collider: se ve que es una caja logica y no arte. Va en el punto de la
+      // celda y no en la caja del sprite, porque es ahi donde lo encola el
+      // motor (ver el Submit a CollisionSystem en main.cpp).
+      //
+      // Una PARED (solid) va en linea llena y roja; un sensor, punteado y
+      // verde. Son dos comportamientos opuestos -- uno frena al jugador y el
+      // otro no -- y sin distinguirlos hay que abrir el inspector de cada
+      // entidad para saber cual es cual.
       if (this.showColliders() && entity.collider) {
-        ctx.setLineDash([3, 3]);
-        ctx.strokeStyle = '#6b9e3f';
+        const solid = entity.collider.solid === true;
+        ctx.strokeStyle = solid ? '#c05050' : '#6b9e3f';
+        ctx.lineWidth = solid ? 1.5 : 1;
+        ctx.setLineDash(solid ? [] : [3, 3]);
         ctx.strokeRect(x, y, entity.collider.width * zoom, entity.collider.height * zoom);
         ctx.setLineDash([]);
       }

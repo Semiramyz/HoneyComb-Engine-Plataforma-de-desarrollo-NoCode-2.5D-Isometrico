@@ -19,4 +19,9 @@ contextBridge.exposeInMainWorld('honeycombProject', {
   writeFile: (relativePath, contents) =>
     ipcRenderer.invoke('project:writeFile', { filePath: relativePath, contents }),
   listDir: (relativeDir) => ipcRenderer.invoke('project:listDir', relativeDir),
+
+  // Lanza el runtime con un nivel ya guardado. Recibe la ruta del nivel y no
+  // la del ejecutable: quien decide que binario correr es el proceso principal,
+  // no la UI.
+  run: (levelPath) => ipcRenderer.invoke('project:run', levelPath),
 });

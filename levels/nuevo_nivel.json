@@ -8,191 +8,35 @@
   },
   "entities": [
     {
-      "id": "slab_1",
-      "type": "slab",
-      "position": {
-        "col": 0,
-        "row": 9
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_2",
-      "type": "slab",
-      "position": {
-        "col": 1,
-        "row": 8
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_3",
-      "type": "slab",
-      "position": {
-        "col": 0,
-        "row": 8
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_4",
-      "type": "slab",
-      "position": {
-        "col": 2,
-        "row": 9
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_5",
-      "type": "slab",
-      "position": {
-        "col": 2,
-        "row": 9
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_6",
-      "type": "slab",
-      "position": {
-        "col": 1,
-        "row": 9
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_7",
-      "type": "slab",
-      "position": {
-        "col": 3,
-        "row": 8
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_8",
-      "type": "slab",
-      "position": {
-        "col": 2,
-        "row": 8
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_9",
-      "type": "slab",
-      "position": {
-        "col": 3,
-        "row": 9
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_10",
-      "type": "slab",
+      "id": "sphere_1",
+      "type": "sphere",
       "position": {
         "col": 4,
-        "row": 8
+        "row": 5
       },
       "texture": "textures/shapes.png",
       "sourceRect": {
-        "x": 198,
-        "y": 0,
+        "x": 132,
+        "y": 98,
         "width": 64,
         "height": 96
       },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_11",
-      "type": "slab",
-      "position": {
-        "col": 4,
-        "row": 7
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
+      "groundOffset": 17,
+      "collider": {
         "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
+        "height": 32
+      }
     },
     {
-      "id": "slab_12",
-      "type": "slab",
+      "id": "cube_1",
+      "type": "cube",
       "position": {
-        "col": 5,
+        "col": 0,
         "row": 9
       },
       "texture": "textures/shapes.png",
       "sourceRect": {
-        "x": 198,
+        "x": 0,
         "y": 0,
         "width": 64,
         "height": 96
@@ -200,447 +44,15 @@
       "groundOffset": 17
     },
     {
-      "id": "slab_13",
-      "type": "slab",
-      "position": {
-        "col": 7,
-        "row": 8
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_14",
-      "type": "slab",
-      "position": {
-        "col": 5,
-        "row": 3
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_15",
-      "type": "slab",
-      "position": {
-        "col": 3,
-        "row": 3
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_16",
-      "type": "slab",
-      "position": {
-        "col": 2,
-        "row": 3
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_17",
-      "type": "slab",
-      "position": {
-        "col": 1,
-        "row": 5
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_18",
-      "type": "slab",
-      "position": {
-        "col": 1,
-        "row": 6
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_19",
-      "type": "slab",
-      "position": {
-        "col": 0,
-        "row": 7
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_20",
-      "type": "slab",
-      "position": {
-        "col": 0,
-        "row": 6
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_21",
-      "type": "slab",
-      "position": {
-        "col": 0,
-        "row": 6
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_22",
-      "type": "slab",
-      "position": {
-        "col": 0,
-        "row": 5
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_23",
-      "type": "slab",
-      "position": {
-        "col": 0,
-        "row": 5
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_24",
-      "type": "slab",
-      "position": {
-        "col": 0,
-        "row": 4
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_25",
-      "type": "slab",
-      "position": {
-        "col": 0,
-        "row": 4
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_26",
-      "type": "slab",
-      "position": {
-        "col": 0,
-        "row": 3
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_27",
-      "type": "slab",
-      "position": {
-        "col": 0,
-        "row": 2
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_28",
-      "type": "slab",
-      "position": {
-        "col": 0,
-        "row": 2
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_29",
-      "type": "slab",
-      "position": {
-        "col": 0,
-        "row": 1
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_30",
-      "type": "slab",
-      "position": {
-        "col": 0,
-        "row": 0
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_31",
-      "type": "slab",
-      "position": {
-        "col": 1,
-        "row": 0
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_32",
-      "type": "slab",
-      "position": {
-        "col": 2,
-        "row": 0
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_33",
-      "type": "slab",
-      "position": {
-        "col": 3,
-        "row": 0
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_34",
-      "type": "slab",
-      "position": {
-        "col": 4,
-        "row": 0
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_35",
-      "type": "slab",
-      "position": {
-        "col": 4,
-        "row": 0
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_36",
-      "type": "slab",
-      "position": {
-        "col": 5,
-        "row": 0
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_37",
-      "type": "slab",
-      "position": {
-        "col": 6,
-        "row": 0
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_38",
-      "type": "slab",
-      "position": {
-        "col": 7,
-        "row": 1
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_39",
-      "type": "slab",
-      "position": {
-        "col": 8,
-        "row": 1
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_40",
-      "type": "slab",
+      "id": "cube_2",
+      "type": "cube",
       "position": {
         "col": 9,
         "row": 0
       },
       "texture": "textures/shapes.png",
       "sourceRect": {
-        "x": 198,
+        "x": 0,
         "y": 0,
         "width": 64,
         "height": 96
@@ -648,1151 +60,15 @@
       "groundOffset": 17
     },
     {
-      "id": "slab_41",
-      "type": "slab",
-      "position": {
-        "col": 9,
-        "row": 1
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_42",
-      "type": "slab",
-      "position": {
-        "col": 8,
-        "row": 0
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_43",
-      "type": "slab",
-      "position": {
-        "col": 7,
-        "row": 0
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_44",
-      "type": "slab",
-      "position": {
-        "col": 9,
-        "row": 2
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_45",
-      "type": "slab",
-      "position": {
-        "col": 9,
-        "row": 6
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_46",
-      "type": "slab",
-      "position": {
-        "col": 9,
-        "row": 3
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_47",
-      "type": "slab",
-      "position": {
-        "col": 9,
-        "row": 2
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_48",
-      "type": "slab",
-      "position": {
-        "col": 8,
-        "row": 4
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_49",
-      "type": "slab",
-      "position": {
-        "col": 9,
-        "row": 4
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_50",
-      "type": "slab",
-      "position": {
-        "col": 9,
-        "row": 4
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_51",
-      "type": "slab",
-      "position": {
-        "col": 9,
-        "row": 5
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_52",
-      "type": "slab",
-      "position": {
-        "col": 9,
-        "row": 7
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_53",
-      "type": "slab",
-      "position": {
-        "col": 9,
-        "row": 7
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_54",
-      "type": "slab",
-      "position": {
-        "col": 8,
-        "row": 8
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_55",
-      "type": "slab",
-      "position": {
-        "col": 9,
-        "row": 9
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_56",
-      "type": "slab",
-      "position": {
-        "col": 9,
-        "row": 8
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_57",
-      "type": "slab",
-      "position": {
-        "col": 7,
-        "row": 9
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_58",
-      "type": "slab",
-      "position": {
-        "col": 8,
-        "row": 9
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_59",
-      "type": "slab",
-      "position": {
-        "col": 6,
-        "row": 9
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_60",
-      "type": "slab",
-      "position": {
-        "col": 4,
-        "row": 9
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_61",
-      "type": "slab",
-      "position": {
-        "col": 5,
-        "row": 7
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_62",
-      "type": "slab",
-      "position": {
-        "col": 5,
-        "row": 8
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_63",
-      "type": "slab",
-      "position": {
-        "col": 6,
-        "row": 8
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_64",
-      "type": "slab",
-      "position": {
-        "col": 6,
-        "row": 7
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_65",
-      "type": "slab",
-      "position": {
-        "col": 7,
-        "row": 7
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_66",
-      "type": "slab",
-      "position": {
-        "col": 8,
-        "row": 6
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_67",
-      "type": "slab",
-      "position": {
-        "col": 8,
-        "row": 7
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_68",
-      "type": "slab",
-      "position": {
-        "col": 9,
-        "row": 5
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_69",
-      "type": "slab",
-      "position": {
-        "col": 8,
-        "row": 5
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_70",
-      "type": "slab",
-      "position": {
-        "col": 8,
-        "row": 3
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_71",
-      "type": "slab",
-      "position": {
-        "col": 8,
-        "row": 2
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_72",
-      "type": "slab",
-      "position": {
-        "col": 7,
-        "row": 2
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_73",
-      "type": "slab",
-      "position": {
-        "col": 7,
-        "row": 5
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_74",
-      "type": "slab",
-      "position": {
-        "col": 7,
-        "row": 6
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_75",
-      "type": "slab",
-      "position": {
-        "col": 7,
-        "row": 4
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_76",
-      "type": "slab",
-      "position": {
-        "col": 7,
-        "row": 3
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_77",
-      "type": "slab",
-      "position": {
-        "col": 6,
-        "row": 1
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_78",
-      "type": "slab",
-      "position": {
-        "col": 6,
-        "row": 2
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_79",
-      "type": "slab",
-      "position": {
-        "col": 6,
-        "row": 3
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_80",
-      "type": "slab",
-      "position": {
-        "col": 6,
-        "row": 4
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_81",
-      "type": "slab",
-      "position": {
-        "col": 6,
-        "row": 5
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_82",
-      "type": "slab",
-      "position": {
-        "col": 6,
-        "row": 6
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_83",
-      "type": "slab",
-      "position": {
-        "col": 5,
-        "row": 6
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_84",
-      "type": "slab",
-      "position": {
-        "col": 5,
-        "row": 5
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_85",
-      "type": "slab",
+      "id": "cube_3",
+      "type": "cube",
       "position": {
         "col": 5,
         "row": 4
       },
       "texture": "textures/shapes.png",
       "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_86",
-      "type": "slab",
-      "position": {
-        "col": 4,
-        "row": 4
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_87",
-      "type": "slab",
-      "position": {
-        "col": 4,
-        "row": 3
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_88",
-      "type": "slab",
-      "position": {
-        "col": 4,
-        "row": 2
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_89",
-      "type": "slab",
-      "position": {
-        "col": 5,
-        "row": 2
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_90",
-      "type": "slab",
-      "position": {
-        "col": 5,
-        "row": 1
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_91",
-      "type": "slab",
-      "position": {
-        "col": 4,
-        "row": 1
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_92",
-      "type": "slab",
-      "position": {
-        "col": 2,
-        "row": 1
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_93",
-      "type": "slab",
-      "position": {
-        "col": 1,
-        "row": 1
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_94",
-      "type": "slab",
-      "position": {
-        "col": 1,
-        "row": 2
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_95",
-      "type": "slab",
-      "position": {
-        "col": 1,
-        "row": 3
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_96",
-      "type": "slab",
-      "position": {
-        "col": 1,
-        "row": 4
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_97",
-      "type": "slab",
-      "position": {
-        "col": 1,
-        "row": 7
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_98",
-      "type": "slab",
-      "position": {
-        "col": 2,
-        "row": 7
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_99",
-      "type": "slab",
-      "position": {
-        "col": 2,
-        "row": 6
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_100",
-      "type": "slab",
-      "position": {
-        "col": 3,
-        "row": 7
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_101",
-      "type": "slab",
-      "position": {
-        "col": 3,
-        "row": 6
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_102",
-      "type": "slab",
-      "position": {
-        "col": 3,
-        "row": 6
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_103",
-      "type": "slab",
-      "position": {
-        "col": 4,
-        "row": 6
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_104",
-      "type": "slab",
-      "position": {
-        "col": 3,
-        "row": 5
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_105",
-      "type": "slab",
-      "position": {
-        "col": 4,
-        "row": 5
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_106",
-      "type": "slab",
-      "position": {
-        "col": 3,
-        "row": 4
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_107",
-      "type": "slab",
-      "position": {
-        "col": 2,
-        "row": 4
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_108",
-      "type": "slab",
-      "position": {
-        "col": 2,
-        "row": 5
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_109",
-      "type": "slab",
-      "position": {
-        "col": 2,
-        "row": 2
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_110",
-      "type": "slab",
-      "position": {
-        "col": 3,
-        "row": 2
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_111",
-      "type": "slab",
-      "position": {
-        "col": 3,
-        "row": 1
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17
-    },
-    {
-      "id": "slab_112",
-      "type": "slab",
-      "position": {
-        "col": 1,
-        "row": 0
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 198,
+        "x": 0,
         "y": 0,
         "width": 64,
         "height": 96
@@ -1805,8 +81,8 @@
     {
       "col": 0,
       "row": 0,
-      "floor": false,
-      "wall": false
+      "floor": true,
+      "wall": true
     },
     {
       "col": 1,
@@ -1817,13 +93,13 @@
     {
       "col": 2,
       "row": 0,
-      "floor": false,
+      "floor": true,
       "wall": true
     },
     {
       "col": 3,
       "row": 0,
-      "floor": false,
+      "floor": true,
       "wall": true
     },
     {
@@ -1835,7 +111,7 @@
     {
       "col": 5,
       "row": 0,
-      "floor": false,
+      "floor": true,
       "wall": true
     },
     {
@@ -1847,19 +123,19 @@
     {
       "col": 7,
       "row": 0,
-      "floor": false,
-      "wall": false
+      "floor": true,
+      "wall": true
     },
     {
       "col": 8,
       "row": 0,
-      "floor": false,
+      "floor": true,
       "wall": true
     },
     {
       "col": 9,
       "row": 0,
-      "floor": false,
+      "floor": true,
       "wall": true
     },
     {
@@ -1919,13 +195,13 @@
     {
       "col": 9,
       "row": 1,
-      "floor": false,
+      "floor": true,
       "wall": true
     },
     {
       "col": 0,
       "row": 2,
-      "floor": false,
+      "floor": true,
       "wall": true
     },
     {
@@ -1985,7 +261,7 @@
     {
       "col": 0,
       "row": 3,
-      "floor": false,
+      "floor": true,
       "wall": true
     },
     {
@@ -2009,7 +285,7 @@
     {
       "col": 4,
       "row": 3,
-      "floor": false,
+      "floor": true,
       "wall": false
     },
     {
@@ -2045,7 +321,7 @@
     {
       "col": 0,
       "row": 4,
-      "floor": false,
+      "floor": true,
       "wall": true
     },
     {
@@ -2099,7 +375,7 @@
     {
       "col": 9,
       "row": 4,
-      "floor": false,
+      "floor": true,
       "wall": true
     },
     {
@@ -2159,13 +435,13 @@
     {
       "col": 9,
       "row": 5,
-      "floor": false,
+      "floor": true,
       "wall": true
     },
     {
       "col": 0,
       "row": 6,
-      "floor": false,
+      "floor": true,
       "wall": true
     },
     {
@@ -2177,7 +453,7 @@
     {
       "col": 2,
       "row": 6,
-      "floor": false,
+      "floor": true,
       "wall": false
     },
     {
@@ -2219,7 +495,7 @@
     {
       "col": 9,
       "row": 6,
-      "floor": false,
+      "floor": true,
       "wall": true
     },
     {
@@ -2237,7 +513,7 @@
     {
       "col": 2,
       "row": 7,
-      "floor": false,
+      "floor": true,
       "wall": false
     },
     {
@@ -2285,7 +561,7 @@
     {
       "col": 0,
       "row": 8,
-      "floor": false,
+      "floor": true,
       "wall": true
     },
     {
@@ -2351,7 +627,7 @@
     {
       "col": 1,
       "row": 9,
-      "floor": false,
+      "floor": true,
       "wall": true
     },
     {

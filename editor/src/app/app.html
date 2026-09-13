@@ -29,8 +29,11 @@
       <span class="brand__name">HoneyComb</span>
     </div>
 
+    <button class="menu" (click)="openLevelFile()" title="Abrir un archivo .json de nivel (Ctrl+O)">
+      Abrir nivel
+    </button>
     <button class="menu" (click)="openProject()" title="Abrir una carpeta de proyecto">
-      Archivo
+      Proyecto
     </button>
     <button class="menu" (click)="newLevel()" title="Crear un nivel nuevo">Nuevo</button>
     <button class="menu" (click)="save()" title="Guardar (Ctrl+S)">
@@ -40,6 +43,12 @@
       Guardar como
     </button>
     <button class="menu" (click)="frameAll()" title="Encuadrar todo (Inicio)">Vista</button>
+
+    <!-- Guarda y lanza el motor con el nivel abierto. Destacado porque es la
+         accion que cierra el ciclo de trabajo: editar, probar, corregir. -->
+    <button class="menu menu--run" (click)="run()" title="Guardar y ejecutar en el motor (F5)">
+      ▶ Ejecutar
+    </button>
 
     <!-- Pestanas de workspace: no cambian de pantalla, cambian que editores
          estan abiertos (ver el tipo Workspace en app.ts). -->
@@ -294,6 +303,26 @@
           }
         </div>
 
+        <!-- Menu contextual del click derecho sobre una entidad.
+             Un solo check porque detras hay un solo booleano del contrato
+             (collider.solid): marcado bloquea el paso, desmarcado se
+             atraviesa. Dos casillas excluyentes para lo mismo solo daban a
+             entender que podian estar las dos apagadas. -->
+        @if (contextMenu(); as menu) {
+          @if (contextMenuEntity(); as entity) {
+            <div class="ctxmenu" [style.left.px]="menu.x" [style.top.px]="menu.y">
+              <div class="ctxmenu__title">{{ entity.id }}</div>
+
+              <label class="ctxmenu__item">
+                <input type="checkbox" [checked]="isWall(entity)"
+                       (change)="setWall(entity.id, checked($event))" />
+                <span>Pared</span>
+                <em>{{ isWall(entity) ? 'bloquea el paso' : 'se atraviesa' }}</em>
+              </label>
+            </div>
+          }
+        }
+
         <div class="vp-chips">
           @if (hovered(); as cell) {
             <span>{{ cell.col }}, {{ cell.row }}</span>
@@ -418,6 +447,14 @@
                       <input type="checkbox" [checked]="!!entity.collider"
                              (change)="toggleCollider(checked($event))" />
                       <span>Collider</span>
+                    </label>
+                    <!-- Lo mismo que ofrece el menu del click derecho. Esta
+                         tambien aca porque es una propiedad del objeto, y el
+                         inspector es donde uno la busca. -->
+                    <label class="check" style="margin-top: 6px">
+                      <input type="checkbox" [checked]="isWall(entity)"
+                             (change)="setWall(entity.id, checked($event))" />
+                      <span>Pared (bloquea el paso)</span>
                     </label>
                     @if (entity.collider; as collider) {
                       <div class="field-row" style="margin-top: 6px">
