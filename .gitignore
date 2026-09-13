@@ -16,3 +16,4 @@ editor/.angular/
 .vs/
 .DS_Store
 Thumbs.db
+*.md
