@@ -35,7 +35,22 @@ import {
   viewChild,
 } from '@angular/core';
 
+import {
+  CHARACTERS,
+  CharacterId,
+  ENGINE_PLAYER_ID,
+  characterDef,
+  characterOf,
+} from './core/characters';
 import { GridCoord, IsoProjection } from './core/iso-projection';
+import {
+  decodeImage,
+  fitTextureSize,
+  renderPng,
+  renderPngBase64,
+  usesNearestNeighbor,
+} from './core/texture-fit';
+import type { ImportSession, ProjectFileData, ProjectNode } from './electron-api';
 import {
   SHAPES,
   SHAPE_SHEET_DATA_URL,
@@ -44,11 +59,18 @@ import {
   SHAPE_TEXTURE,
   ShapeDef,
   ShapeId,
+  shapeCollider,
   shapeDef,
   shapeOf,
 } from './core/iso-shapes';
 import { CatalogEntry, CatalogParamDef } from './models/event-catalog.model';
-import { EventStep, GridConfig, LevelEntity } from './models/level.model';
+import { EventStep, GridConfig, GridPosition, LevelEntity } from './models/level.model';
+import {
+  blockCenter,
+  blocksOverlap,
+  clampBlockPosition,
+  entitySpan,
+} from './core/entity-blocks';
 import { CatalogService } from './services/catalog.service';
 import { LevelService } from './services/level.service';
 import { ProjectService } from './services/project.service';
@@ -66,7 +88,7 @@ export type NewLevelTemplate = 'empty' | 'player' | 'test-scene';
  * "layout" el viewport se queda con todo el alto; las otras dos abren el editor
  * de abajo con eventos o con la consola.
  */
-type Workspace = 'layout' | 'eventos' | 'salida';
+type Workspace = 'layout' | 'eventos' | 'salida' | 'archivo';
 
 /**
  * Pestana del editor de propiedades (la columna de iconos a su izquierda, como
@@ -75,6 +97,46 @@ type Workspace = 'layout' | 'eventos' | 'salida';
  * todo, que es justo lo que esta separacion evita.
  */
 type InspectorTab = 'objeto' | 'escena';
+
+/**
+ * Que editor ocupa el area de arriba a la izquierda. Es el mismo mecanismo que
+ * el selector de tipo de editor de Blender: el area no cambia de lugar ni de
+ * tamano, cambia lo que muestra. "escena" es el outliner de entidades;
+ * "proyecto", el organizador de archivos de la carpeta abierta.
+ */
+type LeftEditor = 'escena' | 'proyecto';
+
+/**
+ * Una fila del explorador de archivos ya aplanada: el nodo y a que profundidad
+ * va sangrado. Ver projectRows().
+ */
+interface TreeRow {
+  node: ProjectNode;
+  depth: number;
+}
+
+/** El archivo que se esta mirando en el visor, con su ruta. */
+interface OpenFile {
+  path: string;
+  data: ProjectFileData;
+}
+
+/**
+ * Algo que quedo esperando respuesta porque cayo sobre celdas ocupadas, y que
+ * se puede resolver en los tres sentidos (reemplazar, superponer, cancelar)
+ * sin rehacer el trabajo. Llega de dos lados:
+ *   place  una entidad nueva, YA ARMADA, que todavia no se agrego
+ *   move   entidades arrastradas con Ctrl que ya se movieron; "originals"
+ *          guarda de donde salieron, para que Cancelar las devuelva ahi
+ */
+type PendingPlacement =
+  | { kind: 'place'; entity: LevelEntity; occupants: LevelEntity[] }
+  | {
+      kind: 'move';
+      movedIds: string[];
+      originals: Map<string, GridPosition>;
+      occupants: LevelEntity[];
+    };
 
 // Presets de zoom de la barra: enteros, porque en pixel art un zoom fraccionario
 // reparte mal los pixeles del sprite (unos de 1px y otros de 2px) y arruina la
@@ -98,6 +160,22 @@ const ZOOM_WHEEL_FACTOR = 1.15;
  */
 const CLICK_SLOP = 4;
 
+// Limites del ancho de los dos paneles laterales al arrastrar su borde. El
+// minimo es lo que necesita una fila para no cortar todos los nombres; el
+// maximo, dejarle al viewport la mitad de una pantalla chica.
+const SIDEBAR_MIN_WIDTH = 170;
+const SIDEBAR_MAX_WIDTH = 560;
+const SIDEBAR_DEFAULT_WIDTH = 230;
+const INSPECTOR_DEFAULT_WIDTH = 290;
+
+/** Cuanto mueve cada flecha del teclado, en celdas de la grilla. */
+const ARROW_NUDGES: Record<string, { col: number; row: number }> = {
+  ArrowRight: { col: 1, row: 0 },
+  ArrowLeft: { col: -1, row: 0 },
+  ArrowDown: { col: 0, row: 1 },
+  ArrowUp: { col: 0, row: -1 },
+};
+
 /** Margen superior del encuadre por defecto, en pixeles de canvas. */
 const VIEW_TOP_MARGIN = 60;
 /** Proporcion del viewport que ocupa la grilla al encuadrarla con Inicio. */
@@ -108,6 +186,30 @@ const FRAME_FILL = 0.82;
 const ENTITY_WARN_THRESHOLD = 150;
 /** Textura de respaldo si el proyecto abierto todavia no tiene ninguna. */
 const DEFAULT_STARTER_TEXTURE = 'player.png';
+
+/**
+ * Cuantas texturas se procesan para el panel Recursos. Las miniaturas se
+ * guardan reducidas, asi que el tope ya no es por memoria sino por tiempo de
+ * carga; las que lo pasan se siguen listando por nombre y se usan igual.
+ */
+const TEXTURE_THUMBNAIL_LIMIT = 400;
+/** Lado de la miniatura guardada: el doble de lo que se ve, para pantallas de alta densidad. */
+const THUMBNAIL_SIDE = 64;
+
+/** Recorte de respaldo cuando no se pudo averiguar el tamano real de la imagen. */
+const FALLBACK_SOURCE_RECT = { x: 0, y: 0, width: 16, height: 16 };
+
+/**
+ * Que hace cada herramienta, para decirlo en la barra de estado al elegirla.
+ * Varias no cambian nada en pantalla hasta el primer click en la grilla, y sin
+ * este mensaje el boton se siente muerto aunque haya respondido.
+ */
+const TOOL_HINTS: Record<Tool, string> = {
+  select: 'Seleccionar: clic sobre una entidad para activarla.',
+  place: 'Colocar: elige una textura en Recursos o una figura, y clic en la grilla.',
+  floor: 'Piso: clic en una celda para quitarle o devolverle el suelo.',
+  wall: 'Pared: clic en una celda para levantar o quitar la pared.',
+};
 
 /** Una fila del formulario dinamico de parametros (ver paramRows()). */
 interface ParamRow {
@@ -136,11 +238,26 @@ export class App {
   // --- Estado del proyecto abierto ------------------------------------------
   readonly levelFiles = signal<string[]>([]);
   readonly textures = signal<string[]>([]);
+  /**
+   * Imagen y medidas de cada textura de assets/textures/, por nombre de
+   * archivo. Sirve para dos cosas: mostrar la miniatura de verdad en el panel
+   * Recursos (antes era un cuadrado vacio, y elegir textura era adivinar), y
+   * saber el tamano real al soltarla sobre una entidad, para recortarla entera
+   * en vez de dejar el recorte viejo.
+   */
+  readonly textureAssets = signal<Record<string, { dataUrl: string; width: number; height: number }>>({});
+  /** Hay una importacion en curso; el boton se apaga para no lanzar dos juntas. */
+  readonly importing = signal(false);
+  /** Numero de la pasada de miniaturas vigente. Ver loadTextureThumbnails(). */
+  private thumbnailRun = 0;
   readonly status = signal('Listo. Abre una carpeta de proyecto, o crea un nivel y usa Guardar como.');
   /** Ultima ruta usada al guardar por dialogo; se propone en el siguiente. */
   readonly lastSavedPath = signal<string | null>(null);
   /** Hay cambios sin guardar. Lo enciende cualquier edicion; solo save() lo apaga. */
   readonly dirty = signal(false);
+
+  /** Colocacion esperando respuesta porque la celda ya tenia algo. */
+  readonly pendingPlacement = signal<PendingPlacement | null>(null);
 
   // --- Dialogo "nivel nuevo" ------------------------------------------------
   readonly showNewLevelDialog = signal(false);
@@ -161,6 +278,12 @@ export class App {
    * ambiguedad que esta a punto de colocar.
    */
   readonly activeShape = signal<ShapeId | null>(null);
+  /**
+   * Arquetipo de personaje elegido en el panel Personajes. Excluyente con los
+   * otros dos por el mismo motivo: la herramienta "place" tiene que saber sin
+   * ambiguedad que esta a punto de colocar.
+   */
+  readonly activeCharacter = signal<CharacterId | null>(null);
   readonly zoom = signal(3);
   readonly showGrid = signal(true);
   readonly showColliders = signal(true);
@@ -172,6 +295,33 @@ export class App {
   readonly inspectorTab = signal<InspectorTab>('objeto');
   readonly log = signal<string[]>([]);
 
+  // --- Explorador de archivos del proyecto ----------------------------------
+  readonly leftEditor = signal<LeftEditor>('escena');
+  /**
+   * Hijos ya leidos de cada carpeta, indexados por su ruta ("" es la raiz del
+   * proyecto). El arbol se llena de a una carpeta por vez, al desplegarla.
+   */
+  private readonly treeChildren = signal<Record<string, ProjectNode[]>>({});
+  /**
+   * Carpetas desplegadas. Aca se guardan las ABIERTAS -- al reves que los
+   * paneles del inspector -- porque con carga perezosa abrir es la accion que
+   * cuesta: lo que nadie desplego no se leyo del disco, y arrancar con todo
+   * abierto significaria leer el proyecto entero.
+   */
+  private readonly expandedDirs = signal<Record<string, boolean>>({});
+  /** El archivo que se esta mirando en el visor (workspace "archivo"). */
+  readonly openFile = signal<OpenFile | null>(null);
+
+  // --- Paneles laterales: ancho y visibilidad -------------------------------
+  // Los dos se comportan igual: se arrastra su borde interior para cambiar el
+  // ancho y se esconden con su boton del topbar.
+  readonly sidebarWidth = signal(SIDEBAR_DEFAULT_WIDTH);
+  readonly sidebarVisible = signal(true);
+  readonly inspectorWidth = signal(INSPECTOR_DEFAULT_WIDTH);
+  readonly inspectorVisible = signal(true);
+  /** Que borde se esta arrastrando, si alguno. La plantilla lo usa para resaltarlo. */
+  private readonly resizing = signal<'sidebar' | 'inspector' | null>(null);
+
   /**
    * Paneles del inspector plegados, por id. Se guarda el conjunto de PLEGADOS y
    * no el de abiertos para que un panel nuevo aparezca desplegado sin tener que
@@ -181,6 +331,7 @@ export class App {
 
   readonly zoomSteps = ZOOM_STEPS;
   readonly shapes = SHAPES;
+  readonly characters = CHARACTERS;
   /** Zoom en porcentaje para la barra de estado, como el de Blender. */
   readonly zoomLabel = computed(() => Math.round(this.zoom() * 100) + '%');
 
@@ -226,16 +377,27 @@ export class App {
   private dragOrigin = { x: 0, y: 0, panX: 0, panY: 0 };
   /** Boton que inicio el gesto en curso, para saber al soltar que hacer con el. */
   private pressedButton: number | null = null;
+  /**
+   * Arrastre con Ctrl+clic en curso: la celda donde empezo, la posicion
+   * original de cada entidad que se lleva, y el desplazamiento ya aplicado.
+   */
+  private moveDrag: {
+    startCell: GridCoord;
+    originals: Map<string, GridPosition>;
+    delta: GridPosition;
+  } | null = null;
+  /** Hay entidades agarradas con Ctrl; la plantilla cambia el cursor a "mano cerrada". */
+  readonly moving = signal(false);
 
   /**
-   * Menu contextual abierto: sobre que entidad, y donde ponerlo (en pixeles
-   * relativos al contenedor del canvas). Null cuando no hay ninguno.
+   * Id de la entidad cuyo menu del clic derecho esta abierto. Null cuando no
+   * hay ninguno. El menu va centrado en la ventana, asi que no guarda posicion.
    */
-  readonly contextMenu = signal<{ id: string; x: number; y: number } | null>(null);
+  readonly contextMenu = signal<string | null>(null);
   /** La entidad del menu abierto, resuelta; undefined si se borro mientras tanto. */
   readonly contextMenuEntity = computed(() => {
-    const menu = this.contextMenu();
-    return menu ? this.entities().find((entity) => entity.id === menu.id) : undefined;
+    const id = this.contextMenu();
+    return id ? this.entities().find((entity) => entity.id === id) : undefined;
   });
 
   // --- Vistas derivadas del nivel abierto -----------------------------------
@@ -244,7 +406,13 @@ export class App {
   readonly entities = computed(() => this.levels.level().entities);
   readonly events = computed(() => this.levels.level().events);
   readonly grid = computed(() => this.levels.level().grid);
+  /** El objeto ACTIVO: el ultimo seleccionado, el unico que muestra el inspector. */
   readonly selected = this.levels.selectedEntity;
+  /** Todos los seleccionados. Sobre estos actuan las operaciones de grupo. */
+  readonly selectedIds = this.levels.selectedEntityIds;
+  readonly selectionCount = computed(() => this.selectedIds().length);
+  /** Consulta rapida para el outliner y el canvas, que preguntan una vez por entidad. */
+  private readonly selectedSet = computed(() => new Set(this.selectedIds()));
   readonly entityIds = computed(() => this.entities().map((entity) => entity.id));
   readonly overBudget = computed(() => this.entities().length > ENTITY_WARN_THRESHOLD);
 
@@ -318,6 +486,12 @@ export class App {
     try {
       this.levelFiles.set(await this.project.listLevels());
       this.textures.set(await this.project.listTextures());
+      // Sin await: las miniaturas van apareciendo solas, y abrir el proyecto no
+      // tiene por que esperar a que se procese una carpeta de 150 imagenes.
+      void this.loadTextureThumbnails();
+      // El explorador arranca con la raiz y nada desplegado, como VS Code.
+      this.treeChildren.set({ '': await this.project.listEntries('') });
+      this.expandedDirs.set({});
       this.note('Proyecto abierto: ' + this.project.projectRoot());
     } catch (error) {
       this.note('No se pudo leer el proyecto: ' + this.describe(error));
@@ -493,6 +667,7 @@ export class App {
       await this.levels.save();
       this.dirty.set(false);
       this.levelFiles.set(await this.project.listLevels());
+      await this.reloadDir('levels');
       this.note('Guardado en levels/' + this.levels.fileName());
     } catch (error) {
       this.note('Error al guardar: ' + this.describe(error));
@@ -542,6 +717,7 @@ export class App {
     if (inLevels) {
       this.levels.fileName.set(inLevels);
       this.levelFiles.set(await this.project.listLevels());
+      await this.reloadDir('levels');
     }
     this.note('Guardado en ' + path);
   }
@@ -569,6 +745,286 @@ export class App {
     return rest.includes('/') ? null : path.slice(path.length - rest.length);
   }
 
+  // --- Explorador de archivos -----------------------------------------------
+  //
+  // Muestra la carpeta del proyecto entera, como el explorador de VS Code, y
+  // deja ABRIR lo que encuentra: un nivel se carga en el viewport, una textura
+  // queda elegida para colocar, y cualquier otro archivo se muestra en el
+  // visor de abajo. Eso es lo que lo separa de una lista decorativa.
+  //
+  // Las carpetas se leen de a una, al desplegarlas (ver el handler en main.js).
+
+  /**
+   * El arbol aplanado a filas con su profundidad, salteando lo que cuelga de
+   * una carpeta cerrada.
+   *
+   * Se aplana aca en vez de dibujarlo recursivamente porque las plantillas de
+   * Angular no tienen recursion: habria que montar un ng-template con
+   * ngTemplateOutlet que se invoca a si mismo, mucha mas maquinaria que este
+   * recorrido. De paso, la plantilla queda con un solo @for plano.
+   */
+  readonly projectRows = computed<TreeRow[]>(() => {
+    const children = this.treeChildren();
+    const expanded = this.expandedDirs();
+    const rows: TreeRow[] = [];
+
+    const walk = (parentPath: string, depth: number): void => {
+      for (const node of children[parentPath] ?? []) {
+        rows.push({ node, depth });
+        if (node.kind === 'dir' && expanded[node.path]) {
+          walk(node.path, depth + 1);
+        }
+      }
+    };
+
+    walk('', 0);
+    return rows;
+  });
+
+  /**
+   * Relee el proyecto desde la raiz y olvida lo que tenia cacheado, para que
+   * aparezca lo que se creo o borro fuera del editor. Las carpetas que estaban
+   * abiertas se vuelven a leer; las cerradas siguen sin costar nada.
+   */
+  async refreshTree(): Promise<void> {
+    if (!this.project.projectRoot()) {
+      this.note('No hay un proyecto abierto. Elige la carpeta raiz con "Carpeta...".');
+      return;
+    }
+    try {
+      const open = Object.keys(this.expandedDirs()).filter((path) => this.expandedDirs()[path]);
+      const children: Record<string, ProjectNode[]> = { '': await this.project.listEntries('') };
+      for (const path of open) {
+        children[path] = await this.project.listEntries(path);
+      }
+      this.treeChildren.set(children);
+      this.note('Proyecto releido: ' + this.project.projectRoot());
+    } catch (error) {
+      // La carpeta pudo haberse movido o borrado desde que se abrio.
+      this.note('No se pudo leer el proyecto: ' + this.describe(error));
+    }
+  }
+
+  /**
+   * Relee UNA carpeta si el explorador ya la tenia cargada. Se usa despues de
+   * guardar, para que el nivel nuevo aparezca en la lista; si esa carpeta
+   * nunca se desplego no hay nada que actualizar y no se toca el disco.
+   */
+  private async reloadDir(path: string): Promise<void> {
+    if (!this.treeChildren()[path]) {
+      return;
+    }
+    const children = await this.project.listEntries(path);
+    this.treeChildren.update((state) => ({ ...state, [path]: children }));
+  }
+
+  isDirExpanded(path: string): boolean {
+    return this.expandedDirs()[path] === true;
+  }
+
+  /** true si esa fila es el nivel que esta abierto ahora, para marcarlo en la lista. */
+  isOpenLevel(node: ProjectNode): boolean {
+    const fileName = this.levels.fileName();
+    return !!fileName && node.path.toLowerCase() === ('levels/' + fileName).toLowerCase();
+  }
+
+  /** true si es el archivo que se esta mirando en el visor. */
+  isOpenFile(node: ProjectNode): boolean {
+    return this.openFile()?.path === node.path;
+  }
+
+  /**
+   * Glifo de la fila: la flecha de plegado si es carpeta, o un icono segun la
+   * extension si es archivo. Los niveles y las imagenes llevan uno propio
+   * porque son los dos tipos que el editor hace algo mas que mostrar.
+   */
+  treeGlyph(node: ProjectNode): string {
+    if (node.kind === 'dir') {
+      return this.isDirExpanded(node.path) ? '▾' : '▸';
+    }
+    if (/\.json$/i.test(node.name)) {
+      return '◈';
+    }
+    if (/\.(png|jpg|jpeg|gif|bmp|webp)$/i.test(node.name)) {
+      return '▦';
+    }
+    return '·';
+  }
+
+  /**
+   * Click sobre una fila. Una carpeta se abre o se cierra (leyendo su contenido
+   * la primera vez); un archivo se abre con lo que corresponda a su tipo, y lo
+   * que el editor no sabe editar se muestra igual en el visor -- que es el
+   * punto de tener un explorador y no una lista de niveles.
+   */
+  async openTreeEntry(node: ProjectNode): Promise<void> {
+    if (node.kind === 'dir') {
+      await this.toggleDir(node);
+      return;
+    }
+
+    if (/^levels\/.+\.json$/i.test(node.path)) {
+      await this.openProjectLevel(node);
+      return;
+    }
+
+    // Solo las texturas de arriba de assets/textures/: lo que guarda
+    // activeTexture es el nombre suelto, y en una subcarpeta perderia el camino.
+    //
+    // Ademas de elegirla se MUESTRA en el visor. Antes solo se elegia, y por
+    // eso la pestana Archivo mostraba una imagen de cualquier otra carpeta pero
+    // nunca las de texturas, que son justo las que uno quiere mirar.
+    if (/^assets\/textures\/[^/]+\.(png|jpg|jpeg|gif)$/i.test(node.path)) {
+      this.selectTexture(node.name);
+      await this.viewFile(node);
+      this.note('Textura activa: ' + node.name + '. Clic en la grilla para colocarla.');
+      return;
+    }
+
+    await this.viewFile(node);
+  }
+
+  /** Abre o cierra una carpeta, leyendo su contenido la primera vez. */
+  private async toggleDir(node: ProjectNode): Promise<void> {
+    const open = this.isDirExpanded(node.path);
+    this.expandedDirs.update((state) => ({ ...state, [node.path]: !open }));
+    if (open || this.treeChildren()[node.path]) {
+      return; // se cerro, o ya se habia leido antes
+    }
+    try {
+      const children = await this.project.listEntries(node.path);
+      this.treeChildren.update((state) => ({ ...state, [node.path]: children }));
+    } catch (error) {
+      this.note('No se pudo leer ' + node.path + ': ' + this.describe(error));
+    }
+  }
+
+  /**
+   * Muestra un archivo en el visor de abajo y trae esa workspace al frente.
+   * El proceso principal decide si llega como texto, como imagen o si no se
+   * puede mostrar (ver project:readFileData en main.js).
+   */
+  private async viewFile(node: ProjectNode): Promise<void> {
+    try {
+      const data = await this.project.readFileData(node.path);
+      this.openFile.set({ path: node.path, data });
+      this.workspace.set('archivo');
+      this.note(
+        data.kind === 'binary'
+          ? node.path + ': ' + this.fileSize(data.size) + ', no se puede mostrar aca.'
+          : 'Mirando ' + node.path + ' (' + this.fileSize(data.size) + ').',
+      );
+    } catch (error) {
+      this.note('No se pudo leer ' + node.path + ': ' + this.describe(error));
+    }
+  }
+
+  closeOpenFile(): void {
+    this.openFile.set(null);
+  }
+
+  /** Tamano legible para la cabecera del visor. */
+  fileSize(bytes: number): string {
+    if (bytes < 1024) {
+      return bytes + ' B';
+    }
+    if (bytes < 1024 * 1024) {
+      return Math.round(bytes / 1024) + ' KB';
+    }
+    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+  }
+
+  // --- Paneles laterales: ocultar y redimensionar ---------------------------
+  //
+  // Como en VS Code: se arrastra el borde interior de cada panel para cambiar
+  // su ancho, y cada uno se esconde con su boton del topbar. Los anchos viven
+  // en signals y la plantilla los inyecta en el grid-template-columns del
+  // cuerpo, asi que no hace falta tocar el DOM a mano en ningun momento.
+
+  toggleSidebar(): void {
+    this.sidebarVisible.update((visible) => !visible);
+  }
+
+  toggleInspector(): void {
+    this.inspectorVisible.update((visible) => !visible);
+  }
+
+  /** Las columnas del cuerpo. Un panel escondido no ocupa columna: desaparece. */
+  bodyColumns(): string {
+    const columns: string[] = [];
+    if (this.sidebarVisible()) {
+      columns.push(this.sidebarWidth() + 'px');
+    }
+    columns.push('1fr');
+    if (this.inspectorVisible()) {
+      columns.push(this.inspectorWidth() + 'px');
+    }
+    return columns.join(' ');
+  }
+
+  isResizing(panel: 'sidebar' | 'inspector'): boolean {
+    return this.resizing() === panel;
+  }
+
+  onResizeStart(panel: 'sidebar' | 'inspector', event: PointerEvent): void {
+    event.preventDefault();
+    this.resizing.set(panel);
+    // Con captura el arrastre sigue aunque el cursor se vaya sobre el canvas,
+    // que es justo lo que pasa al ensanchar un panel.
+    (event.target as HTMLElement).setPointerCapture(event.pointerId);
+  }
+
+  onResizeMove(event: PointerEvent): void {
+    const panel = this.resizing();
+    if (!panel) {
+      return;
+    }
+    // No hace falta guardar donde arranco el gesto: cada panel esta pegado a un
+    // borde de la ventana, asi que su ancho es la distancia del cursor a ese
+    // borde. El izquierdo mide desde 0; el derecho, desde el ancho total.
+    const width =
+      panel === 'sidebar' ? event.clientX : window.innerWidth - event.clientX;
+    const clamped = Math.min(SIDEBAR_MAX_WIDTH, Math.max(SIDEBAR_MIN_WIDTH, Math.round(width)));
+    if (panel === 'sidebar') {
+      this.sidebarWidth.set(clamped);
+    } else {
+      this.inspectorWidth.set(clamped);
+    }
+  }
+
+  onResizeEnd(event: PointerEvent): void {
+    if (!this.resizing()) {
+      return;
+    }
+    this.resizing.set(null);
+    (event.target as HTMLElement).releasePointerCapture(event.pointerId);
+  }
+
+  /**
+   * Abre un nivel elegido en el organizador. Es lo mismo que hace el
+   * desplegable de la topbar, pero para un archivo que puede estar en una
+   * subcarpeta de levels/.
+   */
+  private async openProjectLevel(node: ProjectNode): Promise<void> {
+    try {
+      const level = await this.project.readLevelAt(node.path);
+      // Solo un nivel que este JUSTO en levels/ se adopta con su nombre de
+      // archivo: es lo unico que le permite a Guardar volver a escribirlo sin
+      // preguntar (ver levels.save()).
+      const direct = /^levels\/[^/]+$/i.test(node.path) ? node.name : null;
+      this.levels.adopt(level, direct);
+
+      const root = this.project.projectRoot();
+      // Ruta absoluta para Ejecutar: el motor lee el nivel del disco.
+      this.lastSavedPath.set(root ? root.replace(/[\\/]$/, '') + '/' + node.path : null);
+      this.dirty.set(false);
+      this.frameAll();
+      this.note('Nivel "' + node.path + '" abierto (' + this.entities().length + ' entidades).');
+    } catch (error) {
+      this.note('No se pudo abrir ' + node.path + ': ' + this.describe(error));
+    }
+  }
+
   // --- Interfaz: workspaces y paneles plegables -----------------------------
 
   /** Un panel del inspector esta plegado solo si figura en el mapa como true. */
@@ -578,6 +1034,38 @@ export class App {
 
   togglePanel(id: string): void {
     this.collapsedPanels.update((state) => ({ ...state, [id]: !state[id] }));
+  }
+
+  // Las secciones de la barra izquierda se pliegan con el mismo mapa que los
+  // paneles del inspector, con ids "side-*". Plegada, una seccion queda en su
+  // cabecera sola, como las vistas del explorador de VS Code.
+
+  /** Cambia el editor del area de arriba a la izquierda, y la despliega si estaba plegada. */
+  setLeftEditor(editor: LeftEditor): void {
+    this.leftEditor.set(editor);
+    this.collapsedPanels.update((state) => ({ ...state, 'side-main': false }));
+  }
+
+  /**
+   * Filas de la barra izquierda. Una seccion plegada mide lo que su cabecera,
+   * y el alto que sobra va a la primera seccion abierta que lo aprovecha: la
+   * escena o el explorador, o Recursos si esa esta plegada. Es el mismo reparto
+   * que hace VS Code con sus vistas.
+   */
+  sidebarRows(): string {
+    const mainOpen = !this.isCollapsed('side-main');
+    const assetsOpen = !this.isCollapsed('side-assets');
+    return [
+      mainOpen ? 'minmax(0, 1fr)' : 'auto',
+      !mainOpen && assetsOpen ? 'minmax(0, 1fr)' : 'auto',
+      'auto',
+      'auto',
+    ].join(' ');
+  }
+
+  /** true si el archivo del visor es una imagen que no se muestra solo por su peso. */
+  isTooLargeToPreview(file: OpenFile): boolean {
+    return file.data.kind === 'binary' && file.data.reason === 'too-large';
   }
 
   // --- Ejecutar en el runtime -----------------------------------------------
@@ -633,6 +1121,18 @@ export class App {
   }
 
   // --- Viewport -------------------------------------------------------------
+
+  /**
+   * Cambia la herramienta activa y dice en la barra de estado que hace.
+   *
+   * El mensaje es la parte importante: elegir "piso" o "pared" no cambia nada
+   * en pantalla hasta el primer click sobre la grilla, asi que sin el aviso el
+   * boton parece no responder aunque este encendido.
+   */
+  setTool(tool: Tool): void {
+    this.tool.set(tool);
+    this.note(TOOL_HINTS[tool]);
+  }
 
   setZoom(step: number): void {
     this.zoom.set(this.clampZoom(step));
@@ -745,11 +1245,20 @@ export class App {
       }
       return;
     }
+    if (this.pendingPlacement()) {
+      if (event.key === 'Escape') {
+        this.cancelPending();
+      }
+      return;
+    }
 
-    // Escape cierra el menu contextual antes que nada, para poder salir de el
-    // sin tener que clickear en otro lado.
-    if (event.key === 'Escape' && this.contextMenu()) {
-      this.closeContextMenu();
+    // El menu del clic derecho es un dialogo mas: mientras esta abierto, las
+    // teclas no le llegan a la escena (una X borraria la entidad que se esta
+    // editando), y Escape lo cierra.
+    if (this.contextMenu()) {
+      if (event.key === 'Escape') {
+        this.closeContextMenu();
+      }
       return;
     }
 
@@ -764,6 +1273,17 @@ export class App {
       void this.openLevelFile();
       return;
     }
+    // Ctrl+B esconde la barra lateral, el mismo atajo que en VS Code.
+    if (event.ctrlKey && event.key.toLowerCase() === 'b') {
+      event.preventDefault();
+      this.toggleSidebar();
+      return;
+    }
+    if (event.ctrlKey && event.key.toLowerCase() === 'a') {
+      event.preventDefault();
+      this.selectAllEntities();
+      return;
+    }
     // F5: probar el nivel, como en cualquier entorno de desarrollo.
     if (event.key === 'F5') {
       event.preventDefault();
@@ -773,6 +1293,17 @@ export class App {
     if (event.key === 'Home') {
       event.preventDefault();
       this.frameAll();
+      return;
+    }
+    // Las flechas mueven la seleccion entera una celda. Es la unica forma de
+    // mover varias entidades juntas (ver nudgeSelection).
+    //
+    // Sin nada seleccionado NO se las toca: asi siguen sirviendo para
+    // desplazarse por el visor de archivos o por la consola de abajo.
+    const nudge = ARROW_NUDGES[event.key];
+    if (nudge && this.selectionCount() > 0) {
+      event.preventDefault();
+      this.nudgeSelection(nudge.col, nudge.row);
       return;
     }
     if (event.key === 'Delete' || event.key.toLowerCase() === 'x') {
@@ -794,10 +1325,14 @@ export class App {
   }
 
   onPointerDown(event: PointerEvent): void {
-    // Tres formas de desplazar la vista: boton medio (el de Blender), boton
-    // derecho (la mas comoda con mouse de dos botones o trackpad) y
-    // shift-arrastre (para cuando el derecho ya esta ocupado).
-    if (event.button === 1 || event.button === 2 || event.shiftKey) {
+    // Dos formas de desplazar la vista: boton medio (el de Blender) y boton
+    // derecho (la mas comoda con mouse de dos botones o trackpad).
+    //
+    // Antes tambien paneaba el shift-arrastre. Se quito porque Shift pasa a ser
+    // el modificador de seleccion multiple, que es lo que espera cualquiera que
+    // venga de un editor grafico; los otros dos gestos siguen cubriendo el
+    // paneo de sobra.
+    if (event.button === 1 || event.button === 2) {
       this.panning.set(true);
       // Un click derecho puede terminar en dos cosas distintas segun si el
       // cursor se movio o no: arrastrar la camara, o abrir el menu de la
@@ -821,9 +1356,26 @@ export class App {
     // programa: el menu no debe sobrevivir a la siguiente accion.
     this.contextMenu.set(null);
 
+    // Ctrl+clic sobre una entidad la agarra para moverla, sea cual sea la
+    // herramienta activa: con "colocar" encendida, un clic normal crearia otra
+    // entidad, y justo lo que se quiere es reacomodar la que ya esta. Sobre el
+    // vacio no hace nada, para no colocar ni deseleccionar por accidente.
+    if (event.ctrlKey) {
+      const grabbed = this.entityAt(event);
+      if (grabbed) {
+        this.startMove(grabbed, event);
+      }
+      return;
+    }
+
     const activeTool = this.tool();
     if (activeTool === 'place') {
-      this.placeEntity(this.coordAt(event));
+      const character = this.activeCharacter();
+      if (character) {
+        this.placeCharacter(this.coordAt(event), character);
+      } else {
+        this.placeEntity(this.coordAt(event));
+      }
     } else if (activeTool === 'floor' || activeTool === 'wall') {
       const cell = this.coordAt(event);
       const grid = this.grid();
@@ -833,11 +1385,18 @@ export class App {
       this.levels.toggleTile(cell.col, cell.row, activeTool);
       this.dirty.set(true);
     } else {
-      this.selectEntity(this.entityAt(event));
+      // Shift suma a la seleccion en vez de reemplazarla; sin modificador,
+      // clickear elige una sola y el vacio deselecciona todo. (Ctrl ya no suma
+      // en el viewport: es el gesto de mover, ver arriba.)
+      this.selectEntity(this.entityAt(event), event.shiftKey);
     }
   }
 
   onPointerMove(event: PointerEvent): void {
+    if (this.moveDrag) {
+      this.updateMove(event);
+      return;
+    }
     if (this.panning()) {
       this.pan.set({
         x: this.dragOrigin.panX + (event.clientX - this.dragOrigin.x),
@@ -849,6 +1408,10 @@ export class App {
   }
 
   onPointerUp(event: PointerEvent): void {
+    if (this.moveDrag) {
+      this.finishMove(event);
+      return;
+    }
     if (this.panning()) {
       this.panning.set(false);
       (event.target as HTMLElement).releasePointerCapture(event.pointerId);
@@ -877,23 +1440,176 @@ export class App {
       this.contextMenu.set(null);
       return;
     }
-    const ref = this.viewport();
-    if (!ref) {
-      return;
-    }
-    // Coordenadas relativas al contenedor del canvas, que es contra quien se
-    // posiciona el menu (position: absolute dentro de .canvas-host).
-    const rect = ref.nativeElement.getBoundingClientRect();
     this.selectEntity(id);
-    this.contextMenu.set({
-      id,
-      x: event.clientX - rect.left,
-      y: event.clientY - rect.top,
-    });
+    this.contextMenu.set(id);
   }
 
   closeContextMenu(): void {
     this.contextMenu.set(null);
+  }
+
+  // --- Tamano de las figuras ------------------------------------------------
+  //
+  // Una figura puede ocupar un bloque de NxN celdas ("span" en el contrato),
+  // y se cambia desde el menu del clic derecho. Solo las figuras: son volumenes
+  // pensados para llenar casillas, mientras que agrandar cuatro veces un
+  // personaje de 16 px solo lo dejaria pixelado.
+
+  /** Tamanos que el menu ofrece de un clic; uno mas grande se escribe a mano. */
+  readonly spanChoices = [1, 2, 3, 4];
+
+  isShape(entity: LevelEntity): boolean {
+    return shapeOf(entity) !== undefined;
+  }
+
+  spanOf(entity: LevelEntity): number {
+    return entitySpan(entity);
+  }
+
+  /** El bloque mas grande que entra en la grilla del nivel. */
+  maxSpan(): number {
+    const grid = this.grid();
+    return Math.max(1, Math.min(grid.width, grid.height));
+  }
+
+  /** Ids de las entidades que comparten alguna celda con el bloque de esta. */
+  overlapIds(entity: LevelEntity): string[] {
+    return this.entities()
+      .filter((other) => other.id !== entity.id && blocksOverlap(other, entity))
+      .map((other) => other.id);
+  }
+
+  /**
+   * Cambia cuantas celdas por lado ocupa una figura.
+   *
+   * El collider crece con ella, porque el motor agranda el sprite entero y una
+   * figura grande con la huella de una chica se dejaria atravesar casi toda. Si
+   * el bloque no entra desde su celda, la figura se corre hacia adentro lo
+   * justo, en vez de quedar con celdas fuera del mapa.
+   */
+  setSpan(id: string, requested: number): void {
+    const entity = this.entities().find((candidate) => candidate.id === id);
+    const shape = entity ? shapeOf(entity) : undefined;
+    if (!entity || !shape) {
+      return;
+    }
+
+    const grid = this.grid();
+    const span = Math.min(this.maxSpan(), Math.max(1, Math.round(requested) || 1));
+    const position = clampBlockPosition(entity.position, span, grid);
+    const shifted = position.col !== entity.position.col || position.row !== entity.position.row;
+
+    this.levels.updateEntity(id, {
+      // 1 se omite: es el default del schema, y asi el JSON de lo que no se
+      // agrando queda exactamente igual que antes de que existiera el campo.
+      span: span === 1 ? undefined : span,
+      position,
+      // Se conserva si era pared o sensor; una figura vieja que no tenia
+      // collider recibe el de su forma, solido.
+      collider: {
+        ...shapeCollider(shape, grid, span),
+        solid: entity.collider ? entity.collider.solid : true,
+      },
+    });
+    this.dirty.set(true);
+    this.note(
+      '"' + id + '" ocupa ' + span + '×' + span + ' celdas' +
+        (shifted ? ', corrida a ' + position.col + ',' + position.row + ' para entrar en la grilla.' : '.'),
+    );
+  }
+
+  // --- Mover con Ctrl+arrastrar ---------------------------------------------
+  //
+  // Ctrl+clic sobre una entidad la agarra y arrastrando se la lleva de celda
+  // en celda. Si la agarrada ya estaba seleccionada junto con otras, se mueve
+  // la seleccion entera, que es la operacion de grupo que uno espera. Al
+  // soltar sobre celdas ocupadas se pregunta, igual que al colocar.
+
+  private startMove(id: string, event: PointerEvent): void {
+    if (!this.isEntitySelected(id)) {
+      this.levels.selectEntity(id);
+    }
+    this.inspectorTab.set('objeto');
+
+    const originals = new Map<string, GridPosition>();
+    for (const entity of this.entities()) {
+      if (this.isEntitySelected(entity.id)) {
+        originals.set(entity.id, { ...entity.position });
+      }
+    }
+
+    this.moveDrag = { startCell: this.coordAt(event), originals, delta: { col: 0, row: 0 } };
+    this.moving.set(true);
+    // Con captura, el arrastre sigue aunque el cursor pase sobre un panel.
+    (event.target as HTMLElement).setPointerCapture(event.pointerId);
+    event.preventDefault();
+  }
+
+  private updateMove(event: PointerEvent): void {
+    const drag = this.moveDrag;
+    if (!drag) {
+      return;
+    }
+    const cell = this.coordAt(event);
+    this.hovered.set(cell);
+
+    // El desplazamiento se limita para que NINGUN bloque del grupo se salga de
+    // la grilla. Aplastar contra el borde solo a los que se salen deformaria el
+    // grupo: dejaria de tener la forma con la que se lo agarro.
+    const grid = this.grid();
+    let col = cell.col - drag.startCell.col;
+    let row = cell.row - drag.startCell.row;
+    for (const [id, origin] of drag.originals) {
+      const span = entitySpan(this.entities().find((entity) => entity.id === id) ?? {});
+      col = Math.min(Math.max(col, -origin.col), grid.width - span - origin.col);
+      row = Math.min(Math.max(row, -origin.row), grid.height - span - origin.row);
+    }
+
+    if (col === drag.delta.col && row === drag.delta.row) {
+      return; // sigue en la misma celda: no hay nada que redibujar
+    }
+    drag.delta = { col, row };
+    for (const [id, origin] of drag.originals) {
+      this.levels.updateEntity(id, { position: { col: origin.col + col, row: origin.row + row } });
+    }
+  }
+
+  private finishMove(event: PointerEvent): void {
+    const drag = this.moveDrag;
+    if (!drag) {
+      return;
+    }
+    this.moveDrag = null;
+    this.moving.set(false);
+    (event.target as HTMLElement).releasePointerCapture(event.pointerId);
+
+    // Se solto donde se agarro: no hubo movimiento, y no hay nada que guardar.
+    if (drag.delta.col === 0 && drag.delta.row === 0) {
+      return;
+    }
+
+    const moved = new Set(drag.originals.keys());
+    const movedEntities = this.entities().filter((entity) => moved.has(entity.id));
+    const occupants = this.entities().filter(
+      (other) => !moved.has(other.id) && movedEntities.some((entity) => blocksOverlap(entity, other)),
+    );
+    if (occupants.length > 0) {
+      this.pendingPlacement.set({
+        kind: 'move',
+        movedIds: [...moved],
+        originals: drag.originals,
+        occupants,
+      });
+      return;
+    }
+
+    this.dirty.set(true);
+    if (movedEntities.length === 1) {
+      const { col, row } = movedEntities[0].position;
+      this.note('"' + movedEntities[0].id + '" movida a ' + col + ',' + row + '.');
+    } else {
+      this.note(movedEntities.length + ' entidades movidas.');
+    }
   }
 
   // --- Entidad o pared ------------------------------------------------------
@@ -916,8 +1632,8 @@ export class App {
    * Convierte una entidad en pared o en entidad atravesable.
    *
    * Al hacerla pared se le crea el collider si no tenia: sin caja no hay con
-   * que chocar. Se dimensiona a UNA CELDA para las figuras, porque su huella es
-   * la casilla; para el resto, al tamano de su sprite.
+   * que chocar. Una figura lo recibe con la huella de su forma (ver
+   * shapeCollider); el resto, al tamano de su sprite.
    *
    * Al volverla entidad se conserva el collider y solo se apaga "solid": asi
    * los eventos de contacto que ya estuvieran configurados siguen andando.
@@ -928,12 +1644,12 @@ export class App {
       return;
     }
 
-    const grid = this.grid();
-    const isShape = shapeOf(entity) !== undefined;
-    const collider = entity.collider ?? {
-      width: isShape ? grid.tileWidth : entity.sourceRect.width,
-      height: isShape ? grid.tileHeight : entity.sourceRect.height,
-    };
+    const shape = shapeOf(entity);
+    const collider =
+      entity.collider ??
+      (shape
+        ? shapeCollider(shape, this.grid(), entitySpan(entity))
+        : { width: entity.sourceRect.width, height: entity.sourceRect.height });
 
     this.levels.updateEntity(id, {
       // solid se omite cuando es false: es el default del schema, y asi no
@@ -942,6 +1658,20 @@ export class App {
     });
     this.dirty.set(true);
     this.note('"' + id + '" ahora es ' + (wall ? 'pared: bloquea el paso.' : 'entidad: se atraviesa.'));
+  }
+
+  /**
+   * Lo mismo, pero sobre TODA la seleccion: es la casilla del inspector, que
+   * con varias entidades elegidas tiene que aplicarles el cambio a todas.
+   */
+  setWallOnSelection(wall: boolean): void {
+    const ids = this.selectedIds();
+    for (const id of ids) {
+      this.setWall(id, wall);
+    }
+    if (ids.length > 1) {
+      this.note(ids.length + ' entidades: ' + (wall ? 'ahora bloquean el paso.' : 'ahora se atraviesan.'));
+    }
   }
 
   /**
@@ -959,10 +1689,241 @@ export class App {
 
   // --- Entidades ------------------------------------------------------------
 
+  // Las tres paletas -- Recursos, Figuras y Personajes -- alimentan la MISMA
+  // herramienta de colocar, y por eso elegir en una apaga las otras dos: si no,
+  // "place" no sabria cual de las tres cosas esta a punto de crear.
+
+  /**
+   * Importa una carpeta de imagenes como texturas: las copia a assets/textures/
+   * del proyecto AJUSTADAS a lo que el motor puede dibujar dentro de una celda
+   * (ver core/texture-fit.ts) y las deja listas en Recursos.
+   *
+   * Se copian y no se referencian donde estaban porque el nivel guarda rutas
+   * relativas a assets/: una textura de afuera saldria en negro al ejecutar.
+   *
+   * Ya no exige abrir un proyecto antes. Si falta, el proceso principal lo
+   * deduce -- o lo pregunta en el mismo gesto -- y aca solo hay que ponerse al
+   * dia con la raiz que devuelve.
+   */
+  async importTextures(): Promise<void> {
+    if (!this.hasFileSystem) {
+      this.note('Sin acceso a disco. Abre el editor con "npm run electron".');
+      return;
+    }
+    if (this.importing()) {
+      return;
+    }
+
+    let session: ImportSession | null = null;
+    try {
+      session = await this.project.beginImport();
+    } catch (error) {
+      this.note('No se pudo empezar a importar: ' + this.describe(error));
+      return;
+    }
+    if (!session) {
+      return; // se cancelo la eleccion de la carpeta del proyecto
+    }
+    if (session.projectRoot !== this.project.projectRoot()) {
+      this.project.projectRoot.set(session.projectRoot);
+      await this.refreshProject();
+    }
+    if (session.canceled) {
+      return;
+    }
+
+    // El limite es el ancho de tile del nivel abierto: es la casilla dentro de
+    // la cual tiene que verse el sprite.
+    const maxSide = this.grid().tileWidth;
+    const report = { copied: 0, converted: 0, kept: 0, failed: [] as string[] };
+    this.importing.set(true);
+
+    try {
+      for (const [index, item] of session.items.entries()) {
+        this.note('Importando ' + (index + 1) + '/' + session.items.length + ': ' + item.source);
+        // El sheet de figuras no se toca nunca, aunque venga en la carpeta: es
+        // un spritesheet de 262 px a proposito, y "ajustarlo" a un tile
+        // romperia el recorte de cada figura en el juego.
+        if (item.status === 'exists' || 'textures/' + item.target === SHAPE_TEXTURE) {
+          report.kept += 1;
+          continue;
+        }
+        try {
+          const image = await decodeImage(await this.project.readImportImage(index));
+          const fitted = fitTextureSize(image.naturalWidth, image.naturalHeight, maxSide);
+          const needsConversion = fitted.scaled || !/\.png$/i.test(item.source);
+
+          // Una copia vieja que ya cumplia los requisitos no gana nada
+          // reescribiendose: queda como esta.
+          if (item.status === 'stale' && !needsConversion) {
+            report.kept += 1;
+            continue;
+          }
+
+          const pngBase64 = needsConversion
+            ? renderPngBase64(image, fitted, usesNearestNeighbor(image.naturalWidth, fitted))
+            : null;
+          const { written } = await this.project.writeImportedTexture(index, pngBase64);
+          if (!written) {
+            report.kept += 1;
+          } else if (needsConversion) {
+            report.converted += 1;
+          } else {
+            report.copied += 1;
+          }
+        } catch {
+          // Una imagen rota no corta la importacion del resto; queda en el
+          // informe final con su nombre.
+          report.failed.push(item.source);
+        }
+      }
+    } finally {
+      this.importing.set(false);
+    }
+
+    try {
+      this.textures.set(await this.project.listTextures());
+      void this.loadTextureThumbnails();
+      await this.reloadDir('assets/textures');
+      // Si Recursos estaba plegado, se despliega: es donde esta el resultado.
+      this.collapsedPanels.update((state) => ({ ...state, 'side-assets': false }));
+      this.note(this.describeImport(report, session.items.length, maxSide));
+    } catch (error) {
+      this.note('Se importo, pero no se pudo releer assets/textures: ' + this.describe(error));
+    }
+  }
+
+  /** Resumen de una importacion para la barra de estado. */
+  private describeImport(
+    report: { copied: number; converted: number; kept: number; failed: string[] },
+    total: number,
+    maxSide: number,
+  ): string {
+    if (total === 0) {
+      return 'Esa carpeta no tiene imagenes.';
+    }
+    const parts: string[] = [];
+    if (report.converted > 0) {
+      parts.push(report.converted + ' ajustadas a ' + maxSide + ' px y guardadas como PNG');
+    }
+    if (report.copied > 0) {
+      parts.push(report.copied + ' copiadas tal cual (ya cumplian)');
+    }
+    if (report.kept > 0) {
+      parts.push(report.kept + ' ya estaban y no se tocaron');
+    }
+    if (report.failed.length > 0) {
+      const names = report.failed.slice(0, 3).join(', ') + (report.failed.length > 3 ? '…' : '');
+      parts.push(report.failed.length + ' no se pudieron leer (' + names + ')');
+    }
+    return 'Importacion: ' + parts.join('; ') + '.';
+  }
+
+  /**
+   * Arma las miniaturas del panel Recursos y guarda el tamano real de cada
+   * textura, que es el que se usa al soltarla sobre una entidad.
+   *
+   * Tres cosas hacian que el panel se quedara en cuadros vacios con una
+   * carpeta de capturas, y las tres cambiaron:
+   *   - como "miniatura" se guardaba el data URL COMPLETO de cada imagen;
+   *     ahora se guarda una version reducida de verdad;
+   *   - el panel se actualizaba recien al terminar TODAS; ahora cada miniatura
+   *     aparece apenas esta lista;
+   *   - solo se procesaban las primeras 80.
+   *
+   * "run" corta una pasada vieja si arranca otra (por ejemplo, al terminar una
+   * importacion mientras todavia cargaban las del proyecto): sin eso, las dos
+   * escribirian el mismo signal intercaladas.
+   */
+  private async loadTextureThumbnails(): Promise<void> {
+    const run = ++this.thumbnailRun;
+
+    for (const name of this.textures().slice(0, TEXTURE_THUMBNAIL_LIMIT)) {
+      try {
+        const data = await this.project.readFileData('assets/textures/' + name);
+        if (run !== this.thumbnailRun) {
+          return;
+        }
+        if (data.kind !== 'image') {
+          continue;
+        }
+        const image = await decodeImage(data.dataUrl);
+        const thumb = fitTextureSize(image.naturalWidth, image.naturalHeight, THUMBNAIL_SIDE);
+        const entry = {
+          dataUrl: thumb.scaled
+            ? renderPng(image, thumb, usesNearestNeighbor(image.naturalWidth, thumb))
+            : data.dataUrl,
+          width: image.naturalWidth,
+          height: image.naturalHeight,
+        };
+        if (run !== this.thumbnailRun) {
+          return;
+        }
+        this.textureAssets.update((state) => ({ ...state, [name]: entry }));
+      } catch {
+        // Una imagen rota o bloqueada se queda sin miniatura y nada mas: el
+        // panel tiene que listar igual el resto de la carpeta.
+      }
+    }
+
+    // Se olvidan las de texturas que ya no estan en la carpeta.
+    const present = new Set(this.textures());
+    this.textureAssets.update((state) =>
+      Object.fromEntries(Object.entries(state).filter(([name]) => present.has(name))),
+    );
+  }
+
+  onTextureDragStart(event: DragEvent, name: string): void {
+    event.dataTransfer?.setData('text/honeycomb-texture', name);
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'copy';
+    }
+  }
+
+  /**
+   * Suelta una textura en el viewport. Sobre una entidad le cambia el arte;
+   * sobre una celda vacia crea una entidad nueva con esa textura, igual que
+   * arrastrar una figura.
+   *
+   * El recorte se rehace con el tamano real de la imagen: conservar el anterior
+   * (16x16 por defecto) mostraria apenas la esquina de un sprite mas grande.
+   */
+  private dropTexture(event: DragEvent, name: string): void {
+    const asset = this.textureAssets()[name];
+    const sourceRect =
+      asset && asset.width > 0
+        ? { x: 0, y: 0, width: asset.width, height: asset.height }
+        : { ...FALLBACK_SOURCE_RECT };
+
+    const targetId = this.entityAt(event);
+    if (targetId) {
+      this.levels.updateEntity(targetId, { texture: 'textures/' + name, sourceRect });
+      this.selectEntity(targetId);
+      this.dirty.set(true);
+      this.note('"' + targetId + '" ahora usa ' + name + '.');
+      return;
+    }
+
+    const coord = this.coordAt(event);
+    const grid = this.grid();
+    if (!new IsoProjection(grid.tileWidth, grid.tileHeight).isValidCoord(coord, grid.width, grid.height)) {
+      return;
+    }
+    this.commitPlacement({
+      id: this.nextEntityId('entidad'),
+      type: 'prop',
+      position: { col: coord.col, row: coord.row },
+      // Prefijo "textures/": las rutas del nivel son relativas a assets/.
+      texture: 'textures/' + name,
+      sourceRect,
+    });
+  }
+
   /** Elegir una textura pasa sola a la herramienta de colocar: es lo que se va a hacer. */
   selectTexture(name: string): void {
     this.activeTexture.set(name);
     this.activeShape.set(null);
+    this.activeCharacter.set(null);
     this.tool.set('place');
   }
 
@@ -970,7 +1931,69 @@ export class App {
   selectShape(id: ShapeId): void {
     this.activeShape.set(id);
     this.activeTexture.set(null);
+    this.activeCharacter.set(null);
     this.tool.set('place');
+  }
+
+  /** Idem con un arquetipo del panel Personajes. */
+  selectCharacter(id: CharacterId): void {
+    this.activeCharacter.set(id);
+    this.activeShape.set(null);
+    this.activeTexture.set(null);
+    this.tool.set('place');
+    const def = characterDef(id);
+    if (def) {
+      this.note(def.hint);
+    }
+  }
+
+  /** Nombre del arquetipo elegido, para el chip del viewport. */
+  activeCharacterLabel(): string | null {
+    const id = this.activeCharacter();
+    return id ? characterDef(id)?.label ?? id : null;
+  }
+
+  /**
+   * Crea un personaje en la celda indicada, con todos los campos que el
+   * runtime espera ya puestos (ver core/characters.ts).
+   *
+   * El jugador es el unico caso especial, y no por capricho del editor: el
+   * motor mueve con las flechas a la entidad con id "player_1" y a ninguna
+   * otra, asi que el primer jugador que se coloque tiene que quedarse con ese
+   * id o no va a responder a las teclas.
+   */
+  private placeCharacter(coord: GridCoord, id: CharacterId): void {
+    const def = characterDef(id);
+    const grid = this.grid();
+    if (!def || !new IsoProjection(grid.tileWidth, grid.tileHeight).isValidCoord(coord, grid.width, grid.height)) {
+      return;
+    }
+
+    const taken = new Set(this.entityIds());
+    const isFirstPlayer = def.id === 'player' && !taken.has(ENGINE_PLAYER_ID);
+
+    const entity: LevelEntity = {
+      id: isFirstPlayer ? ENGINE_PLAYER_ID : this.nextEntityId(def.idBase),
+      type: def.type,
+      position: { col: coord.col, row: coord.row },
+      texture: def.texture,
+      sourceRect: { ...def.sourceRect },
+      collider: { ...def.collider },
+      animation: def.animation,
+    };
+
+    const placed = this.commitPlacement(entity);
+
+    // El aviso del jugador se da igual aunque la colocacion quede esperando:
+    // habla del id, no de la celda, y es lo que hay que saber antes de decidir.
+    if (def.id === 'player' && !isFirstPlayer) {
+      this.note(
+        'Ya hay un "' + ENGINE_PLAYER_ID + '": el motor solo mueve a ese. "' +
+          entity.id + '" queda como decorado hasta que le cambies el id.',
+      );
+    } else if (placed) {
+      this.note(def.label + ' "' + entity.id + '" colocado. ' + def.hint);
+    }
   }
 
   /**
@@ -1013,6 +2036,9 @@ export class App {
           // apoya el borde inferior del sprite en el punto de la celda, y un
           // solido tiene que apoyar ahi el centro del rombo de su base.
           groundOffset: def.groundOffset,
+          // La colision de SU forma, no una generica. Antes las figuras salian
+          // sin collider: se veian, pero el jugador las atravesaba.
+          collider: shapeCollider(def, grid),
         }
       : {
           id: this.nextEntityId('entidad'),
@@ -1024,10 +2050,114 @@ export class App {
           sourceRect: { x: 0, y: 0, width: 16, height: 16 },
         };
 
+    this.commitPlacement(entity);
+  }
+
+  // --- Celda ocupada --------------------------------------------------------
+  //
+  // Colocar algo donde ya hay otra cosa no se resuelve solo: antes se apilaba
+  // sin avisar y las dos entidades quedaban en la misma casilla tapandose entre
+  // si -- se veia una sola, y la de abajo aparecia unicamente en el outliner,
+  // asi que lo normal era no enterarse hasta ejecutar el nivel. Ahora se
+  // pregunta, y la respuesta esperable (reemplazar) es la que esta primera.
+
+  /**
+   * Agrega la entidad, salvo que su celda ya este ocupada: en ese caso no toca
+   * nada todavia y deja la colocacion esperando respuesta.
+   *
+   * Devuelve true si quedo colocada en el acto.
+   */
+  private commitPlacement(entity: LevelEntity): boolean {
+    // Por bloque y no por celda exacta: una figura de 3x3 ocupa nueve casillas,
+    // y colocar algo en cualquiera de ellas es ponerlo encima.
+    const occupants = this.entities().filter((other) => blocksOverlap(other, entity));
+    if (occupants.length > 0) {
+      this.pendingPlacement.set({ kind: 'place', entity, occupants });
+      return false;
+    }
+    this.addPlaced(entity);
+    return true;
+  }
+
+  private addPlaced(entity: LevelEntity): void {
     this.levels.addEntity(entity);
     // Queda seleccionada para poder ajustarla en el inspector sin buscarla.
     this.selectEntity(entity.id);
     this.dirty.set(true);
+  }
+
+  /** Saca lo que habia en esas celdas y deja lo nuevo, o lo que se movio. */
+  replacePending(): void {
+    const pending = this.pendingPlacement();
+    if (!pending) {
+      return;
+    }
+    this.pendingPlacement.set(null);
+    this.levels.removeEntities(pending.occupants.map((entity) => entity.id));
+    const replaced =
+      pending.occupants.length === 1
+        ? '"' + pending.occupants[0].id + '" reemplazada'
+        : pending.occupants.length + ' entidades reemplazadas';
+
+    if (pending.kind === 'place') {
+      this.addPlaced(pending.entity);
+      this.note(replaced + ' por "' + pending.entity.id + '".');
+    } else {
+      this.dirty.set(true);
+      this.note(replaced + ' por lo que moviste.');
+    }
+  }
+
+  /** Deja todo en las mismas celdas, una cosa encima de la otra. */
+  stackPending(): void {
+    const pending = this.pendingPlacement();
+    if (!pending) {
+      return;
+    }
+    this.pendingPlacement.set(null);
+    if (pending.kind === 'place') {
+      this.addPlaced(pending.entity);
+      this.note('"' + pending.entity.id + '" queda encima de lo que ya habia en esa celda.');
+    } else {
+      this.dirty.set(true);
+      this.note('Queda encima de lo que ya habia en esas celdas.');
+    }
+  }
+
+  /** Descarta: una colocacion no se hace, y un movimiento vuelve a donde estaba. */
+  cancelPending(): void {
+    const pending = this.pendingPlacement();
+    this.pendingPlacement.set(null);
+    if (pending?.kind === 'move') {
+      for (const [id, position] of pending.originals) {
+        this.levels.updateEntity(id, { position });
+      }
+    }
+  }
+
+  /** Texto del dialogo de celdas ocupadas, segun de donde venga la espera. */
+  pendingSummary(): string {
+    const pending = this.pendingPlacement();
+    if (!pending) {
+      return '';
+    }
+    const there =
+      pending.occupants.length === 1
+        ? 'ya esta "' + pending.occupants[0].id + '"'
+        : 'ya hay ' + pending.occupants.length + ' entidades';
+
+    if (pending.kind === 'place') {
+      const { col, row } = pending.entity.position;
+      return (
+        'En la celda ' + col + ',' + row + ' ' + there +
+        '. Vas a colocar "' + pending.entity.id + '".'
+      );
+    }
+    const what =
+      pending.movedIds.length === 1
+        ? '"' + pending.movedIds[0] + '"'
+        : pending.movedIds.length + ' entidades';
+    return 'Donde soltaste ' + what + ' ' + there + '. Cancelar lo devuelve a donde estaba.';
   }
 
   // --- Arrastrar una primitiva al viewport ----------------------------------
@@ -1039,6 +2169,14 @@ export class App {
 
   onShapeDragStart(event: DragEvent, id: ShapeId): void {
     event.dataTransfer?.setData('text/honeycomb-shape', id);
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'copy';
+    }
+  }
+
+  /** Idem para los personajes, con su propio tipo de dato para no confundirlos. */
+  onCharacterDragStart(event: DragEvent, id: CharacterId): void {
+    event.dataTransfer?.setData('text/honeycomb-character', id);
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = 'copy';
     }
@@ -1058,6 +2196,19 @@ export class App {
 
   onCanvasDrop(event: DragEvent): void {
     event.preventDefault();
+
+    const textureName = event.dataTransfer?.getData('text/honeycomb-texture');
+    if (textureName) {
+      this.dropTexture(event, textureName);
+      return;
+    }
+
+    const characterId = event.dataTransfer?.getData('text/honeycomb-character');
+    if (characterId && characterDef(characterId)) {
+      this.placeCharacter(this.coordAt(event), characterId as CharacterId);
+      return;
+    }
+
     const id = event.dataTransfer?.getData('text/honeycomb-shape');
     // Puede caer aca cualquier cosa arrastrada desde fuera del editor.
     if (!id || !shapeDef(id)) {
@@ -1070,47 +2221,150 @@ export class App {
     this.hovered.set(null);
   }
 
+  // --- Seleccion ------------------------------------------------------------
+  //
+  // La seleccion es una LISTA, no una sola entidad, con el mismo reparto que
+  // hace Blender: todas las seleccionadas reciben las operaciones de grupo
+  // (borrar, duplicar, mover, marcar como pared), pero solo la ultima -- el
+  // "objeto activo" -- es la que muestra el inspector, porque un formulario no
+  // puede mostrar dos valores distintos en el mismo campo.
+
   /**
    * Selecciona una entidad y trae al frente la pestana de propiedades del
    * objeto: seleccionar algo y que el inspector siga mostrando la escena seria
    * un click perdido.
+   *
+   * Con "additive" (Shift o Ctrl) la suma o la quita de la seleccion en vez de
+   * reemplazarla.
    */
-  selectEntity(id: string | null): void {
-    this.levels.selectEntity(id);
-    if (id) {
-      this.inspectorTab.set('objeto');
-    }
-  }
-
-  deleteSelected(): void {
-    const id = this.levels.selectedEntityId();
+  selectEntity(id: string | null, additive = false): void {
     if (!id) {
+      // Clickear el vacio con Shift no deberia tirar abajo lo que ya estaba
+      // seleccionado: el gesto es "agregar", y ahi no hay nada que agregar.
+      if (!additive) {
+        this.levels.selectEntity(null);
+      }
       return;
     }
-    this.levels.removeEntity(id);
-    this.dirty.set(true);
-    this.note('Entidad "' + id + '" eliminada.');
+    if (additive) {
+      this.levels.toggleEntitySelection(id);
+    } else {
+      this.levels.selectEntity(id);
+    }
+    this.inspectorTab.set('objeto');
+  }
+
+  isEntitySelected(id: string): boolean {
+    return this.selectedSet().has(id);
   }
 
   /**
-   * Duplica la entidad seleccionada una celda a la derecha. Los objetos
-   * anidados se copian a mano: el spread es superficial, y sin esto la copia
-   * compartiria sourceRect y collider con el original (editar uno movería los dos).
+   * Clic en una fila del outliner. Se comporta como cualquier lista de
+   * escritorio: Ctrl suma o quita una, Shift selecciona el rango desde la
+   * activa hasta la clickeada.
    */
-  duplicateSelected(): void {
-    const source = this.selected();
-    if (!source) {
+  onOutlinerClick(id: string, event: MouseEvent): void {
+    if (event.shiftKey) {
+      this.selectRangeTo(id);
       return;
     }
-    const copy: LevelEntity = {
-      ...source,
-      id: this.nextEntityId(source.type || 'entidad'),
-      position: { col: source.position.col + 1, row: source.position.row },
-      sourceRect: { ...source.sourceRect },
-      collider: source.collider ? { ...source.collider } : undefined,
-    };
-    this.levels.addEntity(copy);
-    this.selectEntity(copy.id);
+    this.selectEntity(id, event.ctrlKey);
+  }
+
+  /** Selecciona de la entidad activa a la clickeada, en el orden del outliner. */
+  private selectRangeTo(id: string): void {
+    const ids = this.entityIds();
+    const anchor = this.levels.selectedEntityId();
+    const from = anchor ? ids.indexOf(anchor) : -1;
+    const to = ids.indexOf(id);
+    if (to < 0) {
+      return;
+    }
+    // Sin ancla previa no hay rango que trazar: vale como un clic normal.
+    if (from < 0) {
+      this.selectEntity(id);
+      return;
+    }
+    const range = ids.slice(Math.min(from, to), Math.max(from, to) + 1);
+    // La clickeada queda al final para que sea la activa, sin importar hacia
+    // que lado se trazo el rango.
+    this.levels.selectEntities([...range.filter((other) => other !== id), id]);
+    this.inspectorTab.set('objeto');
+  }
+
+  selectAllEntities(): void {
+    this.levels.selectEntities(this.entityIds());
+    this.inspectorTab.set('objeto');
+  }
+
+  /** Borra TODA la seleccion, no solo la entidad activa. */
+  deleteSelected(): void {
+    const ids = this.selectedIds();
+    if (ids.length === 0) {
+      return;
+    }
+    this.levels.removeEntities(ids);
+    this.dirty.set(true);
+    this.note(
+      ids.length === 1 ? 'Entidad "' + ids[0] + '" eliminada.' : ids.length + ' entidades eliminadas.',
+    );
+  }
+
+  /**
+   * Duplica toda la seleccion una celda a la derecha y deja seleccionadas las
+   * copias, que es lo que uno quiere seguir moviendo.
+   *
+   * Los objetos anidados se copian a mano: el spread es superficial, y sin esto
+   * la copia compartiria sourceRect y collider con el original (editar uno
+   * moveria los dos).
+   */
+  duplicateSelected(): void {
+    const sources = this.entities().filter((entity) => this.isEntitySelected(entity.id));
+    if (sources.length === 0) {
+      return;
+    }
+
+    const copies: string[] = [];
+    for (const source of sources) {
+      const copy: LevelEntity = {
+        ...source,
+        id: this.nextEntityId(source.type || 'entidad'),
+        position: { col: source.position.col + 1, row: source.position.row },
+        sourceRect: { ...source.sourceRect },
+        collider: source.collider ? { ...source.collider } : undefined,
+      };
+      this.levels.addEntity(copy);
+      copies.push(copy.id);
+    }
+
+    this.levels.selectEntities(copies);
+    this.dirty.set(true);
+    this.note(copies.length === 1 ? 'Copia creada.' : copies.length + ' copias creadas.');
+  }
+
+  /**
+   * Mueve la seleccion entera por celdas (las flechas del teclado). Es la
+   * unica forma de mover VARIAS a la vez: los campos de columna y fila del
+   * inspector escriben un valor absoluto, y aplicarlo a todas las amontonaria
+   * en la misma casilla.
+   */
+  nudgeSelection(deltaCol: number, deltaRow: number): void {
+    const ids = this.selectedIds();
+    if (ids.length === 0) {
+      return;
+    }
+    const grid = this.grid();
+    for (const entity of this.entities()) {
+      if (!this.isEntitySelected(entity.id)) {
+        continue;
+      }
+      this.levels.updateEntity(entity.id, {
+        position: {
+          col: Math.min(grid.width - 1, Math.max(0, entity.position.col + deltaCol)),
+          row: Math.min(grid.height - 1, Math.max(0, entity.position.row + deltaRow)),
+        },
+      });
+    }
     this.dirty.set(true);
   }
 
@@ -1151,14 +2405,21 @@ export class App {
   }
 
   /**
-   * Activa o desactiva el collider. Al activarlo arranca del tamano del
-   * sprite, que es lo que se espera casi siempre; al desactivarlo se pone en
-   * undefined para que la clave no aparezca en el JSON (el schema la trata
-   * como ausente = la entidad no colisiona).
+   * Activa o desactiva el collider. Al activarlo, una figura recupera la
+   * colision de su forma -- es tambien la manera de arreglar una figura vieja
+   * que quedo sin collider: apagar y prender la casilla -- y el resto arranca
+   * del tamano del sprite. Al desactivarlo se pone en undefined para que la
+   * clave no aparezca en el JSON (el schema la trata como ausente = la entidad
+   * no colisiona).
    */
   toggleCollider(enabled: boolean): void {
     const entity = this.selected();
     if (!entity) {
+      return;
+    }
+    const shape = shapeOf(entity);
+    if (enabled && shape) {
+      this.patchEntity({ collider: shapeCollider(shape, this.grid(), entitySpan(entity)) });
       return;
     }
     this.patchEntity({
@@ -1387,7 +2648,7 @@ export class App {
    * alto sobresale de su rombo, y hay que poder clickear la parte que se ve.
    * Devuelve el id de la entidad clickeada, o null si no hay ninguna.
    */
-  private entityAt(event: PointerEvent): string | null {
+  private entityAt(event: MouseEvent): string | null {
     const ref = this.viewport();
     if (!ref) {
       return null;
@@ -1404,13 +2665,13 @@ export class App {
     // solapamiento gane el sprite que se ve encima: es el que el usuario
     // creyo estar clickeando.
     const ordered = [...this.entities()].sort(
-      (a, b) => iso.gridToScreen(b.position).y - iso.gridToScreen(a.position).y,
+      (a, b) => iso.gridToScreen(blockCenter(b)).y - iso.gridToScreen(blockCenter(a)).y,
     );
     for (const entity of ordered) {
       // La misma caja que usa draw(), a zoom 1 (x e y ya vienen sin zoom). Si
       // el hit-test calculara la suya por separado, clickear una entidad
       // seleccionaria otra cosa en cuanto una de las dos formulas cambiara.
-      const box = this.spriteBox(entity, iso.gridToScreen(entity.position), 1);
+      const box = this.spriteBox(entity, iso.gridToScreen(blockCenter(entity)), 1);
 
       if (x >= box.x && x <= box.x + box.w && y >= box.y && y <= box.y + box.h) {
         return entity.id;
@@ -1438,11 +2699,14 @@ export class App {
     anchor: { x: number; y: number },
     zoom: number,
   ): { x: number; y: number; w: number; h: number } {
-    const w = entity.sourceRect.width * zoom;
-    const h = entity.sourceRect.height * zoom;
+    // Con span, el motor agranda el sprite y su groundOffset span veces, y
+    // "anchor" ya tiene que ser el centro del bloque (ver blockCenter).
+    const scale = entitySpan(entity) * zoom;
+    const w = entity.sourceRect.width * scale;
+    const h = entity.sourceRect.height * scale;
     return {
       x: anchor.x - w / 2,
-      y: anchor.y - h + (entity.groundOffset ?? 0) * zoom,
+      y: anchor.y - h + (entity.groundOffset ?? 0) * scale,
       w,
       h,
     };
@@ -1634,12 +2898,20 @@ export class App {
 
     // Mismo criterio de profundidad que ZSortSystem::Flush(): menor Y primero.
     const ordered = [...level.entities].sort(
-      (a, b) => iso.gridToScreen(a.position).y - iso.gridToScreen(b.position).y,
+      // Por el centro del bloque, que es el sortPosition del motor.
+      (a, b) => iso.gridToScreen(blockCenter(a)).y - iso.gridToScreen(blockCenter(b)).y,
     );
 
+    const selectedIds = this.selectedSet();
+
     for (const entity of ordered) {
-      const { x, y } = project(entity.position);
-      const isSelected = entity.id === selectedId;
+      const { x, y } = project(blockCenter(entity));
+      // Dos estados distintos, como en Blender: "seleccionada" (contorno mas
+      // apagado) y "activa" (la ultima que se toco, en naranja pleno). Con una
+      // seleccion de varias, sin esa diferencia no se sabria cual es la que
+      // esta mostrando el inspector.
+      const isSelected = selectedIds.has(entity.id);
+      const isActive = entity.id === selectedId;
 
       // Una primitiva de bloqueo se dibuja como solido isometrico; el resto,
       // Caja del sprite en pantalla, con la MISMA regla que main.cpp:
@@ -1679,25 +2951,57 @@ export class App {
         const solid = entity.collider.solid === true;
         ctx.strokeStyle = solid ? '#c05050' : '#6b9e3f';
         ctx.lineWidth = solid ? 1.5 : 1;
-        ctx.setLineDash(solid ? [] : [3, 3]);
-        ctx.strokeRect(x, y, entity.collider.width * zoom, entity.collider.height * zoom);
-        ctx.setLineDash([]);
+
+        if (solid) {
+          // Lo que BLOQUEA es una caja en celdas: main.cpp divide el collider
+          // por el tamano del tile y compara contra la casilla. En pantalla esa
+          // caja es un rombo sobre el piso, y es el que se dibuja. Antes era un
+          // rectangulo colgando del punto de la celda, que no coincidia con lo
+          // que frena al jugador: un cubo y un pilar se veian con la misma
+          // colision aunque bloquean superficies muy distintas.
+          const halfCols = entity.collider.width / grid.tileWidth / 2;
+          const halfRows = entity.collider.height / grid.tileHeight / 2;
+          const { col, row } = blockCenter(entity);
+          const corners = [
+            project({ col: col - halfCols, row: row - halfRows }),
+            project({ col: col + halfCols, row: row - halfRows }),
+            project({ col: col + halfCols, row: row + halfRows }),
+            project({ col: col - halfCols, row: row + halfRows }),
+          ];
+          ctx.beginPath();
+          ctx.moveTo(corners[0].x, corners[0].y);
+          for (const corner of corners.slice(1)) {
+            ctx.lineTo(corner.x, corner.y);
+          }
+          ctx.closePath();
+          ctx.fillStyle = 'rgba(192, 80, 80, 0.18)';
+          ctx.fill();
+          ctx.stroke();
+        } else {
+          // Un sensor no bloquea: solo dispara on_collision, y el motor lo
+          // detecta con OTRA caja, en pixeles y colgando del punto de la celda
+          // (el Submit a CollisionSystem en main.cpp). Esa es la que se dibuja.
+          ctx.setLineDash([3, 3]);
+          ctx.strokeRect(x, y, entity.collider.width * zoom, entity.collider.height * zoom);
+          ctx.setLineDash([]);
+        }
       }
 
-      // Contorno naranja del objeto activo, igual que el de Blender: un halo
-      // oscuro por fuera para que se lea sobre cualquier color de relleno, y el
-      // naranja pegado al sprite.
+      // Contorno naranja, igual que el de Blender: un halo oscuro por fuera
+      // para que se lea sobre cualquier color de relleno, y el naranja pegado
+      // al sprite. El objeto activo lo lleva pleno; el resto de la seleccion,
+      // en un tono mas apagado.
       if (isSelected) {
         ctx.lineWidth = 3;
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
         ctx.strokeRect(box.x - 2, box.y - 2, box.w + 4, box.h + 4);
         ctx.lineWidth = 1.5;
-        ctx.strokeStyle = '#ff8b1f';
+        ctx.strokeStyle = isActive ? '#ff8b1f' : '#b06a26';
         ctx.strokeRect(box.x - 2, box.y - 2, box.w + 4, box.h + 4);
       }
 
       // Ancla real del runtime: la punta superior del rombo (origin {0,0}).
-      ctx.fillStyle = isSelected ? '#ff8b1f' : 'rgba(255, 255, 255, 0.55)';
+      ctx.fillStyle = isActive ? '#ff8b1f' : 'rgba(255, 255, 255, 0.55)';
       ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
 
       // El id solo desde 2x: mas chico, las etiquetas se pisan entre si y
@@ -1785,20 +3089,17 @@ export class App {
   }
 
   /**
-   * Color de relleno por tipo de entidad. Los tipos son texto libre en el
-   * schema: los que no estan aca caen al azul por defecto, sin romper nada.
+   * Color de relleno por tipo de entidad. Los arquetipos de la paleta traen el
+   * suyo, asi que el color del viewport y el del icono del panel Personajes no
+   * pueden separarse. Los tipos son texto libre en el schema: lo que no
+   * reconoce nadie cae al azul por defecto, sin romper nada.
    */
   private entityColor(type: string): string {
-    switch (type) {
-      case 'player':
-        return '#e08a3c';
-      case 'obstacle':
-        return '#c05050';
-      case 'item':
-        return '#5f9e4a';
-      default:
-        return '#4772b3';
+    const character = characterOf({ type });
+    if (character) {
+      return character.color;
     }
+    return type === 'obstacle' ? '#c05050' : '#4772b3';
   }
 
   // --- Utilidades de plantilla ---------------------------------------------

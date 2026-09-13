@@ -19,6 +19,16 @@ contextBridge.exposeInMainWorld('honeycombProject', {
   writeFile: (relativePath, contents) =>
     ipcRenderer.invoke('project:writeFile', { filePath: relativePath, contents }),
   listDir: (relativeDir) => ipcRenderer.invoke('project:listDir', relativeDir),
+  // Para el explorador de archivos: el contenido de UNA carpeta (se piden de a
+  // una, al desplegarla), y la lectura de cualquier archivo para mirarlo.
+  listEntries: (relativeDir) => ipcRenderer.invoke('project:listEntries', relativeDir),
+  readFileData: (relativePath) => ipcRenderer.invoke('project:readFileData', relativePath),
+  // Importar imagenes como texturas, en tres pasos (ver project:beginImport en
+  // main.js). Los dos ultimos reciben un indice del plan, nunca una ruta.
+  beginImport: () => ipcRenderer.invoke('project:beginImport'),
+  readImportImage: (index) => ipcRenderer.invoke('project:readImportImage', index),
+  writeImportedTexture: (index, pngBase64) =>
+    ipcRenderer.invoke('project:writeImportedTexture', { index, pngBase64 }),
 
   // Lanza el runtime con un nivel ya guardado. Recibe la ruta del nivel y no
   // la del ejecutable: quien decide que binario correr es el proceso principal,

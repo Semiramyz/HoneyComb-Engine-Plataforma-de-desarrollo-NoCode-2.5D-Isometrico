@@ -1,90 +1,606 @@
 {
   "name": "prueba_figuras",
-  "grid": { "width": 8, "height": 8, "tileWidth": 64, "tileHeight": 32 },
-  "visuals": {
-    "floor": {
-      "texture": "textures/floor.png",
-      "sourceRect": { "x": 0, "y": 0, "width": 64, "height": 64 }
-    },
-    "wall": {
-      "texture": "textures/wall.png",
-      "sourceRect": { "x": 0, "y": 0, "width": 32, "height": 32 }
-    }
+  "grid": {
+    "width": 8,
+    "height": 8,
+    "tileWidth": 64,
+    "tileHeight": 32
   },
   "entities": [
     {
       "id": "player_1",
       "type": "player",
-      "position": { "col": 5, "row": 5 },
+      "position": {
+        "col": 5,
+        "row": 5
+      },
       "texture": "textures/player.png",
-      "sourceRect": { "x": 0, "y": 0, "width": 16, "height": 16 },
+      "sourceRect": {
+        "x": 0,
+        "y": 0,
+        "width": 16,
+        "height": 16
+      },
       "animation": "player_idle",
-      "collider": { "width": 16, "height": 16 }
+      "collider": {
+        "width": 16,
+        "height": 16
+      }
     },
     {
       "id": "cube_1",
       "type": "cube",
-      "position": { "col": 1, "row": 1 },
+      "position": {
+        "col": 1,
+        "row": 1
+      },
       "texture": "textures/shapes.png",
-      "sourceRect": { "x": 0, "y": 0, "width": 64, "height": 96 },
-      "groundOffset": 17
+      "sourceRect": {
+        "x": 0,
+        "y": 0,
+        "width": 64,
+        "height": 96
+      },
+      "groundOffset": 17,
+      "collider": {
+        "width": 64,
+        "height": 32,
+        "solid": true
+      }
     },
     {
       "id": "pyramid_1",
       "type": "pyramid",
-      "position": { "col": 3, "row": 1 },
+      "position": {
+        "col": 3,
+        "row": 1
+      },
       "texture": "textures/shapes.png",
-      "sourceRect": { "x": 66, "y": 0, "width": 64, "height": 96 },
-      "groundOffset": 17
+      "sourceRect": {
+        "x": 66,
+        "y": 0,
+        "width": 64,
+        "height": 96
+      },
+      "groundOffset": 17,
+      "collider": {
+        "width": 64,
+        "height": 32,
+        "solid": true
+      }
     },
     {
       "id": "ramp_1",
       "type": "ramp",
-      "position": { "col": 5, "row": 1 },
+      "position": {
+        "col": 5,
+        "row": 1
+      },
       "texture": "textures/shapes.png",
-      "sourceRect": { "x": 132, "y": 0, "width": 64, "height": 96 },
-      "groundOffset": 17
+      "sourceRect": {
+        "x": 132,
+        "y": 0,
+        "width": 64,
+        "height": 96
+      },
+      "groundOffset": 17,
+      "collider": {
+        "width": 64,
+        "height": 32,
+        "solid": true
+      }
     },
     {
       "id": "slab_1",
       "type": "slab",
-      "position": { "col": 1, "row": 3 },
+      "position": {
+        "col": 1,
+        "row": 3
+      },
       "texture": "textures/shapes.png",
-      "sourceRect": { "x": 198, "y": 0, "width": 64, "height": 96 },
-      "groundOffset": 17
+      "sourceRect": {
+        "x": 198,
+        "y": 0,
+        "width": 64,
+        "height": 96
+      },
+      "groundOffset": 17,
+      "collider": {
+        "width": 64,
+        "height": 32,
+        "solid": true
+      }
     },
     {
       "id": "cylinder_1",
       "type": "cylinder",
-      "position": { "col": 3, "row": 3 },
+      "position": {
+        "col": 3,
+        "row": 3
+      },
       "texture": "textures/shapes.png",
-      "sourceRect": { "x": 0, "y": 98, "width": 64, "height": 96 },
-      "groundOffset": 17
+      "sourceRect": {
+        "x": 0,
+        "y": 98,
+        "width": 64,
+        "height": 96
+      },
+      "groundOffset": 17,
+      "collider": {
+        "width": 64,
+        "height": 32,
+        "solid": true
+      }
     },
     {
       "id": "cone_1",
       "type": "cone",
-      "position": { "col": 5, "row": 3 },
+      "position": {
+        "col": 5,
+        "row": 3
+      },
       "texture": "textures/shapes.png",
-      "sourceRect": { "x": 66, "y": 98, "width": 64, "height": 96 },
-      "groundOffset": 17
+      "sourceRect": {
+        "x": 66,
+        "y": 98,
+        "width": 64,
+        "height": 96
+      },
+      "groundOffset": 17,
+      "collider": {
+        "width": 64,
+        "height": 32,
+        "solid": true
+      }
     },
     {
       "id": "sphere_1",
       "type": "sphere",
-      "position": { "col": 1, "row": 5 },
+      "position": {
+        "col": 1,
+        "row": 5
+      },
       "texture": "textures/shapes.png",
-      "sourceRect": { "x": 132, "y": 98, "width": 64, "height": 96 },
-      "groundOffset": 17
+      "sourceRect": {
+        "x": 132,
+        "y": 98,
+        "width": 64,
+        "height": 96
+      },
+      "groundOffset": 17,
+      "collider": {
+        "width": 64,
+        "height": 32,
+        "solid": true
+      }
     },
     {
       "id": "pillar_1",
       "type": "pillar",
-      "position": { "col": 3, "row": 5 },
+      "position": {
+        "col": 3,
+        "row": 5
+      },
       "texture": "textures/shapes.png",
-      "sourceRect": { "x": 198, "y": 98, "width": 64, "height": 96 },
-      "groundOffset": 17
+      "sourceRect": {
+        "x": 198,
+        "y": 98,
+        "width": 64,
+        "height": 96
+      },
+      "groundOffset": 17,
+      "collider": {
+        "width": 64,
+        "height": 32,
+        "solid": true
+      }
     }
   ],
-  "events": []
+  "events": [],
+  "visuals": {
+    "floor": {
+      "texture": "textures/floor.png",
+      "sourceRect": {
+        "x": 0,
+        "y": 0,
+        "width": 64,
+        "height": 64
+      }
+    },
+    "wall": {
+      "texture": "textures/wall.png",
+      "sourceRect": {
+        "x": 0,
+        "y": 0,
+        "width": 32,
+        "height": 32
+      }
+    }
+  },
+  "tiles": [
+    {
+      "col": 0,
+      "row": 0,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 1,
+      "row": 0,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 2,
+      "row": 0,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 3,
+      "row": 0,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 4,
+      "row": 0,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 5,
+      "row": 0,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 6,
+      "row": 0,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 7,
+      "row": 0,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 0,
+      "row": 1,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 1,
+      "row": 1,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 2,
+      "row": 1,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 3,
+      "row": 1,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 4,
+      "row": 1,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 5,
+      "row": 1,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 6,
+      "row": 1,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 7,
+      "row": 1,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 0,
+      "row": 2,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 1,
+      "row": 2,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 2,
+      "row": 2,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 3,
+      "row": 2,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 4,
+      "row": 2,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 5,
+      "row": 2,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 6,
+      "row": 2,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 7,
+      "row": 2,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 0,
+      "row": 3,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 1,
+      "row": 3,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 2,
+      "row": 3,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 3,
+      "row": 3,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 4,
+      "row": 3,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 5,
+      "row": 3,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 6,
+      "row": 3,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 7,
+      "row": 3,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 0,
+      "row": 4,
+      "floor": true,
+      "wall": true
+    },
+    {
+      "col": 1,
+      "row": 4,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 2,
+      "row": 4,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 3,
+      "row": 4,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 4,
+      "row": 4,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 5,
+      "row": 4,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 6,
+      "row": 4,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 7,
+      "row": 4,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 0,
+      "row": 5,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 1,
+      "row": 5,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 2,
+      "row": 5,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 3,
+      "row": 5,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 4,
+      "row": 5,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 5,
+      "row": 5,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 6,
+      "row": 5,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 7,
+      "row": 5,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 0,
+      "row": 6,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 1,
+      "row": 6,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 2,
+      "row": 6,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 3,
+      "row": 6,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 4,
+      "row": 6,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 5,
+      "row": 6,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 6,
+      "row": 6,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 7,
+      "row": 6,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 0,
+      "row": 7,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 1,
+      "row": 7,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 2,
+      "row": 7,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 3,
+      "row": 7,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 4,
+      "row": 7,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 5,
+      "row": 7,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 6,
+      "row": 7,
+      "floor": true,
+      "wall": false
+    },
+    {
+      "col": 7,
+      "row": 7,
+      "floor": true,
+      "wall": false
+    }
+  ]
 }

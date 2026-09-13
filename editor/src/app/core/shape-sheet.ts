@@ -29,6 +29,12 @@ export interface ShapeCell {
    * "groundOffset" del nivel; ver el calculo en el generador.
    */
   groundOffset: number;
+  /**
+   * Ancho de la base en celdas: 1 llena la casilla, 0.42 es la base angosta
+   * del pilar. Es la huella con la que la figura choca, y de aca sale el
+   * "collider" que el editor le pone al colocarla (ver shapeCollider).
+   */
+  footprint: number;
 }
 
 export const SHAPE_CELLS: readonly ShapeCell[] = [
@@ -38,6 +44,7 @@ export const SHAPE_CELLS: readonly ShapeCell[] = [
     height: 1,
     sourceRect: { x: 0, y: 0, width: 64, height: 96 },
     groundOffset: 17,
+    footprint: 1,
   },
   {
     id: 'pyramid',
@@ -45,6 +52,7 @@ export const SHAPE_CELLS: readonly ShapeCell[] = [
     height: 1.5,
     sourceRect: { x: 66, y: 0, width: 64, height: 96 },
     groundOffset: 17,
+    footprint: 1,
   },
   {
     id: 'ramp',
@@ -52,6 +60,7 @@ export const SHAPE_CELLS: readonly ShapeCell[] = [
     height: 1,
     sourceRect: { x: 132, y: 0, width: 64, height: 96 },
     groundOffset: 17,
+    footprint: 1,
   },
   {
     id: 'slab',
@@ -59,6 +68,7 @@ export const SHAPE_CELLS: readonly ShapeCell[] = [
     height: 0.25,
     sourceRect: { x: 198, y: 0, width: 64, height: 96 },
     groundOffset: 17,
+    footprint: 1,
   },
   {
     id: 'cylinder',
@@ -66,6 +76,7 @@ export const SHAPE_CELLS: readonly ShapeCell[] = [
     height: 1,
     sourceRect: { x: 0, y: 98, width: 64, height: 96 },
     groundOffset: 17,
+    footprint: 0.82,
   },
   {
     id: 'cone',
@@ -73,6 +84,7 @@ export const SHAPE_CELLS: readonly ShapeCell[] = [
     height: 1.5,
     sourceRect: { x: 66, y: 98, width: 64, height: 96 },
     groundOffset: 17,
+    footprint: 0.82,
   },
   {
     id: 'sphere',
@@ -80,6 +92,7 @@ export const SHAPE_CELLS: readonly ShapeCell[] = [
     height: 1,
     sourceRect: { x: 132, y: 98, width: 64, height: 96 },
     groundOffset: 17,
+    footprint: 0.8,
   },
   {
     id: 'pillar',
@@ -87,5 +100,6 @@ export const SHAPE_CELLS: readonly ShapeCell[] = [
     height: 2,
     sourceRect: { x: 198, y: 98, width: 64, height: 96 },
     groundOffset: 17,
+    footprint: 0.42,
   },
 ];

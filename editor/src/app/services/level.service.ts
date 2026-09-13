@@ -7,10 +7,30 @@ import { ProjectService } from './project.service';
 // default que usa LevelLoader.cpp cuando el JSON no declara medidas de tile.
 const DEFAULT_GRID: GridConfig = { width: 10, height: 10, tileWidth: 64, tileHeight: 32 };
 
+/**
+ * Piso y pared por defecto de un nivel, con las mismas texturas y recortes que
+ * traen los niveles escritos a mano (levels/test_level.json).
+ *
+ * No es decoracion, es lo que hace que las herramientas de piso y pared
+ * SIRVAN: main.cpp recorre wallTiles solo si el nivel declara una textura de
+ * pared, asi que en un nivel sin "visuals" una pared dibujada en el editor no
+ * se ve ni frena a nadie al ejecutar. Los niveles que creaba el editor no
+ * traian el bloque, y por eso esas dos herramientas no tenian ningun efecto.
+ *
+ * Es una funcion y no una constante para que cada nivel reciba su propio
+ * objeto: compartiendolo, editar el recorte de uno cambiaria el de todos.
+ */
+function defaultVisuals(): NonNullable<Level['visuals']> {
+  return {
+    floor: { texture: 'textures/floor.png', sourceRect: { x: 0, y: 0, width: 64, height: 64 } },
+    wall: { texture: 'textures/wall.png', sourceRect: { x: 0, y: 0, width: 32, height: 32 } },
+  };
+}
+
 // Se copia la grilla con spread: si se compartiera la constante, editar el
 // tamano de un nivel cambiaria el default de todos los que se creen despues.
 function emptyLevel(name: string): Level {
-  return { name, grid: { ...DEFAULT_GRID }, entities: [], events: [] };
+  return { name, grid: { ...DEFAULT_GRID }, entities: [], events: [], visuals: defaultVisuals() };
 }
 
 // Mantiene el nivel actualmente abierto en memoria y expone operaciones para
@@ -22,10 +42,22 @@ export class LevelService {
   readonly level = signal<Level>(emptyLevel('nuevo_nivel'));
   /** Archivo de origen dentro de levels/. Null si el nivel todavia no se guardo nunca. */
   readonly fileName = signal<string | null>(null);
-  /** Se guarda el id y no la entidad: la entidad se reemplaza en cada edicion (estado inmutable). */
-  readonly selectedEntityId = signal<string | null>(null);
+  /**
+   * Entidades seleccionadas, por id. Se guardan ids y no entidades porque la
+   * entidad se reemplaza entera en cada edicion (estado inmutable).
+   *
+   * El ORDEN importa: el ultimo de la lista es el objeto activo, el mismo
+   * reparto que hace Blender. La seleccion puede tener muchos elementos y
+   * sobre todos ellos actuan las operaciones de grupo (borrar, duplicar,
+   * mover); el activo es el unico que muestra el inspector, porque los campos
+   * de un formulario solo pueden mostrar un valor a la vez.
+   */
+  readonly selectedEntityIds = signal<string[]>([]);
 
-  /** La entidad seleccionada, resuelta desde el id. undefined si se borro o no hay ninguna. */
+  /** El objeto activo: el ultimo que se agrego a la seleccion. */
+  readonly selectedEntityId = computed<string | null>(() => this.selectedEntityIds().at(-1) ?? null);
+
+  /** La entidad activa, resuelta desde el id. undefined si se borro o no hay ninguna. */
   readonly selectedEntity = computed<LevelEntity | undefined>(() => {
     const id = this.selectedEntityId();
     return id ? this.level().entities.find((entity) => entity.id === id) : undefined;
@@ -42,7 +74,7 @@ export class LevelService {
   createNew(name: string, grid: GridConfig = DEFAULT_GRID): void {
     this.level.set({ ...emptyLevel(name), grid: { ...grid } });
     this.fileName.set(null);
-    this.selectedEntityId.set(null);
+    this.selectedEntityIds.set([]);
   }
 
   async load(fileName: string): Promise<void> {
@@ -60,7 +92,7 @@ export class LevelService {
   adopt(level: Level, fileName: string | null): void {
     this.level.set(level);
     this.fileName.set(fileName);
-    this.selectedEntityId.set(null);
+    this.selectedEntityIds.set([]);
   }
 
   /**
@@ -89,15 +121,19 @@ export class LevelService {
   }
 
   removeEntity(id: string): void {
+    this.removeEntities([id]);
+  }
+
+  /** Borra varias de una vez: es lo que necesita una seleccion multiple. */
+  removeEntities(ids: readonly string[]): void {
+    const doomed = new Set(ids);
     this.level.update((level) => ({
       ...level,
-      entities: level.entities.filter((entity) => entity.id !== id),
+      entities: level.entities.filter((entity) => !doomed.has(entity.id)),
     }));
     // Sin esto quedaria una seleccion apuntando a algo que ya no existe, y el
     // inspector mostraria un panel vacio sin explicacion.
-    if (this.selectedEntityId() === id) {
-      this.selectedEntityId.set(null);
-    }
+    this.selectedEntityIds.update((selected) => selected.filter((id) => !doomed.has(id)));
   }
 
   /** Materializa la grilla legacy y alterna piso o pared en una celda. */
@@ -122,12 +158,32 @@ export class LevelService {
       } else {
         tiles.push(updated);
       }
-      return { ...level, tiles };
+      // Un nivel abierto de disco puede no traer "visuals" (los que creaba el
+      // editor antes no lo traian). Se completa aca y no al abrirlo para no
+      // ensuciar con un bloque que nadie pidio los niveles que solo se miran:
+      // este es el momento en que las celdas empiezan a importar.
+      return { ...level, tiles, visuals: level.visuals ?? defaultVisuals() };
     });
   }
 
+  /** Deja seleccionada solo esa entidad, o nada si llega null. */
   selectEntity(id: string | null): void {
-    this.selectedEntityId.set(id);
+    this.selectedEntityIds.set(id ? [id] : []);
+  }
+
+  selectEntities(ids: readonly string[]): void {
+    this.selectedEntityIds.set([...ids]);
+  }
+
+  /**
+   * Suma o quita una entidad de la seleccion, que es lo que hace Shift+clic.
+   * Al sumarla queda al final, o sea que pasa a ser la activa: el inspector
+   * muestra siempre la ultima que se toco.
+   */
+  toggleEntitySelection(id: string): void {
+    this.selectedEntityIds.update((selected) =>
+      selected.includes(id) ? selected.filter((other) => other !== id) : [...selected, id],
+    );
   }
 
   // Los eventos no tienen id propio en el schema: se los identifica por su

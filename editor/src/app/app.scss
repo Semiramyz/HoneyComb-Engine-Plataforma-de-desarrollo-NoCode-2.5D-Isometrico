@@ -135,6 +135,12 @@
     background: var(--widget);
   }
 
+  /* El unico menu que es un interruptor (mostrar la barra lateral): se hunde
+     cuando esta encendido, para que se lea como tal y no como un boton mas. */
+  &.is-active {
+    background: var(--widget);
+  }
+
   /* Ejecutar: el unico boton del topbar con color propio. Es la accion que
      saca el nivel del editor y lo pone a correr, y conviene encontrarla sin
      leer. Verde y no el azul de acento, que en este tema significa
@@ -198,6 +204,9 @@
    NO es decorativo: por defecto un hijo de grid o flex no achica por debajo de
    su contenido, asi que sin esto un panel con muchas entidades estira la
    ventana en vez de mostrar su propia barra de scroll. */
+/* Las columnas las escribe la plantilla con bodyColumns(), porque el ancho de
+   la barra lateral se arrastra y puede esconderse entera. Lo de aca es solo el
+   valor de arranque, para que el primer render no aparezca sin columnas. */
 .body {
   display: grid;
   grid-template-columns: 230px 1fr 290px;
@@ -249,13 +258,112 @@
   }
 }
 
-/* La columna izquierda apila tres editores. Solo el arbol de escena es
-   elastico; recursos y figuras ocupan lo que necesitan y se quedan abajo. */
+/* Boton de plegar de las secciones de la barra izquierda. Reemplaza al icono
+   de tipo, que antes era solo una etiqueta: como en VS Code, un clic deja la
+   seccion en su cabecera sola y le devuelve el alto a las demas. La flechita
+   se gira para decir en que estado esta sin tener que probar. */
+.area__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 18px;
+  padding: 0 5px;
+  border: 0;
+  border-radius: 3px;
+  background: var(--widget);
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--widget-hover);
+  }
+
+  /* Plegada se hunde en la cabecera: se lee como "aca hay algo guardado". */
+  &.is-collapsed {
+    background: transparent;
+    color: var(--text-dim);
+
+    &:hover {
+      background: var(--widget);
+    }
+  }
+}
+
+.area__chevron {
+  display: inline-block;
+  font-size: 8px;
+  transition: transform 0.1s ease-out;
+
+  .is-collapsed > & {
+    transform: rotate(-90deg);
+  }
+}
+
+/* Un boton de cabecera apagado mientras trabaja (Importar durante una
+   importacion): se ve y se lee, pero no se puede lanzar otra vez. */
+.tool:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+/* La columna izquierda apila cuatro editores. Solo el primero (escena o
+   explorador) es elastico; las tres paletas ocupan lo que necesitan y se
+   quedan abajo.
+
+   "relative" es para el borde arrastrable, que se posiciona contra esta caja
+   en vez de ocupar una columna propia del grid del cuerpo. El z-index lo
+   acompana: el borde sobresale unos pixeles hacia el viewport, y sin un
+   contexto de apilado por encima quedaria tapado por el contenedor del canvas
+   (que tambien esta posicionado y viene despues en el DOM). */
 .stack {
+  position: relative;
+  z-index: 2;
   display: grid;
-  grid-template-rows: 1fr auto auto;
+  /* Valor de arranque: las filas reales las escribe sidebarRows(), porque
+     dependen de que secciones esten plegadas. */
+  grid-template-rows: 1fr auto auto auto;
+  /* Con todo plegado no queda ninguna fila elastica, y sin esto el navegador
+     estiraria las cabeceras para repartir el alto sobrante. */
+  align-content: start;
   gap: 2px;
   min-height: 0;
+}
+
+/* El panel de propiedades necesita las mismas dos cosas que la barra
+   izquierda: ser el ancla de su borde arrastrable, y quedar por encima del
+   contenedor del canvas para que ese borde no aparezca tapado. */
+.inspector {
+  position: relative;
+  z-index: 2;
+}
+
+/* Borde arrastrable de un panel lateral, como el de VS Code: una tira invisible
+   un poco mas ancha que el surco, para poder agarrarla sin apuntar al pixel. Se
+   pinta sola al pasar por encima o mientras se arrastra. Cada variante se pega
+   al canto que da al viewport. */
+.grip {
+  position: absolute;
+  top: 0;
+  z-index: 5;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  /* Sin esto, el navegador cancela el arrastre y empieza a seleccionar texto. */
+  touch-action: none;
+
+  &--right {
+    right: -3px;
+  }
+  &--left {
+    left: -3px;
+  }
+
+  &:hover,
+  &.is-active {
+    background: var(--accent);
+  }
 }
 
 /* ---------- Outliner (arbol de escena) ---------- */
@@ -281,10 +389,18 @@
     background: #3a3a3a;
   }
 
-  /* Fila seleccionada: el azul de Blender ocupa la fila entera. */
+  /* Fila seleccionada: el azul de Blender ocupa la fila entera. Con una
+     seleccion de varias, todas se pintan igual. */
   &.is-active {
     background: var(--accent);
     color: var(--text-bright);
+  }
+
+  /* El objeto ACTIVO dentro de la seleccion: el unico que muestra el
+     inspector. Lo marca una barra naranja a la izquierda, el mismo color con
+     el que el viewport lo contornea. */
+  &.is-current {
+    box-shadow: inset 3px 0 0 var(--active);
   }
 
   &--root {
@@ -330,6 +446,44 @@
   }
 }
 
+/* ---------- Organizador de archivos del proyecto ---------- */
+.filetree {
+  padding-bottom: 2px;
+}
+
+/* Los dos botones de entrada del panel, pegados arriba y separados del arbol
+   por la misma linea suave que divide el resto del editor. */
+.filetools {
+  display: flex;
+  gap: 4px;
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--border-soft);
+
+  > .btn {
+    flex: 1;
+    /* Los nombres no se cortan a la mitad en un dock de 230px. */
+    white-space: nowrap;
+  }
+}
+
+/* Fila del arbol de archivos: el mismo aspecto que una fila del outliner. Lo
+   unico propio es que la sangria la calcula la plantilla segun la profundidad,
+   porque aca los niveles no son dos fijos como alla. */
+.filerow {
+  /* Valor de arranque; lo pisa el [style.padding-left.px] de la plantilla. */
+  padding-left: 8px;
+
+  /* Una carpeta es estructura, no contenido: se lee un escalon por debajo de
+     los archivos que uno realmente va a abrir. */
+  &--dir .tree__label {
+    color: var(--text-dim);
+  }
+
+  &--dir .tree__icon {
+    color: var(--text-dim);
+  }
+}
+
 /* ---------- Paleta de recursos (asset browser) ---------- */
 .assets {
   /* auto-fill con minimo de 64px: entran tantas miniaturas por fila como
@@ -337,9 +491,16 @@
      se topea para que la paleta no se coma el arbol de escena. */
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  align-content: start;
   gap: 4px;
   padding: 6px;
   max-height: 176px;
+
+  /* Con la escena plegada, Recursos hereda el alto libre de la barra: el tope
+     ya no hace falta, y es justo el caso de una carpeta con 150 imagenes. */
+  &--fill {
+    max-height: none;
+  }
 }
 
 .asset {
@@ -365,9 +526,12 @@
   }
 
   &__thumb {
+    display: grid;
+    place-items: center;
     width: 32px;
     height: 32px;
     border-radius: 2px;
+    overflow: hidden;
     /* Tablero de ajedrez: el fondo canonico de transparencia en pixel art. */
     background-image:
       linear-gradient(45deg, #4a4a4a 25%, transparent 25%),
@@ -378,6 +542,17 @@
     background-size: 8px 8px;
     background-position: 0 0, 0 4px, 4px -4px, -4px 0;
     image-rendering: pixelated;
+  }
+
+  /* La imagen real de la textura, sobre el tablero de transparencia. Va
+     contenida y no estirada: un sprite ancho no tiene por que deformarse solo
+     para llenar un cuadrado de 32px. */
+  &__img {
+    max-width: 100%;
+    max-height: 100%;
+    image-rendering: pixelated;
+    /* El fantasma que arrastra el navegador sale del boton, no de la imagen. */
+    pointer-events: none;
   }
 
   &__name {
@@ -445,6 +620,58 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: 9px;
+  }
+}
+
+/* Icono de un arquetipo de personaje. A diferencia del de las figuras no es un
+   recorte del spritesheet: un personaje puede tener cualquier arte, asi que lo
+   que lo identifica en la paleta es su color -- el mismo con el que el viewport
+   dibuja sus entidades, para que paleta y escena se lean juntas. */
+.character__icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 3px;
+  color: #101010;
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* Entidades agarradas con Ctrl: mano cerrada mientras se arrastran. Con dos
+   clases para ganarle al cursor de la herramienta activa, que se declara mas
+   abajo con la misma especificidad. */
+.canvas.canvas--moving {
+  cursor: grabbing;
+}
+
+/* ---------- Visor de archivos ---------- */
+/* Solo lectura: el editor muestra el archivo, no lo edita. Es la diferencia
+   entre poder revisar el proyecto sin salir de la ventana y tener que abrir
+   otro programa para mirar un .cpp o un .md. */
+.fileview {
+  margin: 0;
+  padding: 8px 10px;
+  color: var(--text);
+  font-family: ui-monospace, "Cascadia Mono", monospace;
+  font-size: 11px;
+  line-height: 1.5;
+  /* Se respetan los saltos del archivo pero las lineas largas bajan solas: una
+     barra horizontal en un panel de 200px de alto es incomodisima. */
+  white-space: pre-wrap;
+  word-break: break-word;
+
+  &--image {
+    display: grid;
+    place-items: center;
+    padding: 12px;
+
+    img {
+      max-width: 100%;
+      max-height: 240px;
+      /* Casi todo lo que se mira aca es pixel art. */
+      image-rendering: pixelated;
+    }
   }
 }
 
@@ -565,62 +792,6 @@
 
   &__active {
     color: rgba(255, 255, 255, 0.85);
-  }
-}
-
-/* Menu contextual del click derecho. Flota sobre el canvas, posicionado en el
-   punto donde se hizo click (las coordenadas las pone la plantilla).
-
-   A diferencia de los overlays informativos de abajo, este SI recibe clicks:
-   es el unico elemento sobre el canvas con el que se interactua. */
-.ctxmenu {
-  position: absolute;
-  z-index: 5;
-  min-width: 170px;
-  padding: 4px;
-  border-radius: var(--radius);
-  background: var(--bg-panel);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.55);
-
-  &__title {
-    padding: 3px 8px 5px;
-    color: var(--text-dim);
-    font-family: ui-monospace, "Cascadia Mono", monospace;
-    font-size: 10px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  &__item {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    padding: 4px 8px;
-    border-radius: 3px;
-    cursor: pointer;
-
-    &:hover {
-      background: var(--accent);
-      color: var(--text-bright);
-    }
-
-    input {
-      accent-color: var(--accent);
-      margin: 0;
-    }
-
-    /* La aclaracion de que hace cada opcion, a la derecha y atenuada: son dos
-       palabras que evitan tener que probar cual era cual. */
-    em {
-      margin-left: auto;
-      color: var(--text-dim);
-      font-size: 10px;
-      font-style: normal;
-    }
-    &:hover em {
-      color: #d6e2f5;
-    }
   }
 }
 

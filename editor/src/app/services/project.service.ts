@@ -1,5 +1,6 @@
 import { Injectable, signal } from '@angular/core';
 
+import type { ImportSession, ProjectFileData, ProjectNode } from '../electron-api';
 import { EventCatalog } from '../models/event-catalog.model';
 import { Level } from '../models/level.model';
 
@@ -79,8 +80,45 @@ export class ProjectService {
   }
 
   async readLevel(fileName: string): Promise<Level> {
-    const contents = await window.honeycombProject.readFile(`levels/${fileName}`);
-    return parseLevel(contents, fileName);
+    return this.readLevelAt(`levels/${fileName}`);
+  }
+
+  /**
+   * Igual que readLevel(), pero con la ruta relativa completa dentro del
+   * proyecto. Lo usa el organizador de archivos, que abre el .json donde sea
+   * que este y no solo el nivel de arriba de levels/.
+   */
+  async readLevelAt(relativePath: string): Promise<Level> {
+    const contents = await window.honeycombProject.readFile(relativePath);
+    return parseLevel(contents, relativePath);
+  }
+
+  /**
+   * Contenido de una carpeta del proyecto, para el explorador. Se piden de a
+   * una, al desplegarla: ver el comentario del handler en main.js.
+   */
+  async listEntries(relativeDir: string): Promise<ProjectNode[]> {
+    return window.honeycombProject.listEntries(relativeDir);
+  }
+
+  /** Lee un archivo cualquiera del proyecto para mirarlo en el visor. */
+  async readFileData(relativePath: string): Promise<ProjectFileData> {
+    return window.honeycombProject.readFileData(relativePath);
+  }
+
+  // Importar imagenes va en tres pasos porque el ajuste de tamano lo hace la UI
+  // (ver el comentario de project:beginImport en main.js).
+
+  async beginImport(): Promise<ImportSession | null> {
+    return window.honeycombProject.beginImport();
+  }
+
+  async readImportImage(index: number): Promise<string> {
+    return window.honeycombProject.readImportImage(index);
+  }
+
+  async writeImportedTexture(index: number, pngBase64: string | null): Promise<{ written: boolean }> {
+    return window.honeycombProject.writeImportedTexture(index, pngBase64);
   }
 
   /**

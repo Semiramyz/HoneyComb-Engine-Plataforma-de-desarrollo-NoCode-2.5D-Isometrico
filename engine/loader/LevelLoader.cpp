@@ -143,6 +143,12 @@ LoadedLevel LevelLoader::Load(const std::string& levelPath, EventSystem& eventSy
             // existiera este campo se siguen dibujando exactamente igual.
             entity.groundOffset = entityJson.value("groundOffset", 0.0f);
 
+            // Opcional y por defecto 1, por el mismo motivo. Un valor menor que
+            // 1 no tiene sentido (no se puede ocupar media casilla) y se trata
+            // como 1 en vez de dejar que el sprite se dibuje con tamano cero.
+            int span = entityJson.value("span", 1);
+            entity.span = span < 1 ? 1 : span;
+
             // Collider opcional. size {0,0} = la entidad no participa de la
             // deteccion; solid=false = participa (dispara on_collision) pero
             // no frena al jugador, o sea, funciona como sensor/trigger.

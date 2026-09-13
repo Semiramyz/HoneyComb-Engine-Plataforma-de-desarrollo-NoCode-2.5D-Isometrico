@@ -130,6 +130,12 @@ app.on('window-all-closed', () => {
 // Estos dos no dependen de que haya un proyecto abierto: el usuario elige el
 // archivo a mano en el dialogo, y esa eleccion es la autorizacion.
 
+/**
+ * Ultimo nivel abierto o guardado por dialogo. Sirve para deducir la carpeta
+ * del proyecto cuando nadie la abrio a mano (ver inferProjectRoot).
+ */
+let lastLevelPath = null;
+
 ipcMain.handle('project:save', async (_event, { defaultPath, contents }) => {
   const { canceled, filePath } = await dialog.showSaveDialog({
     defaultPath: defaultPath || 'level.json',
@@ -137,6 +143,7 @@ ipcMain.handle('project:save', async (_event, { defaultPath, contents }) => {
   });
   if (canceled || !filePath) return { canceled: true };
   await fs.writeFile(filePath, contents, 'utf-8');
+  lastLevelPath = filePath;
   return { canceled: false, filePath };
 });
 
@@ -147,6 +154,7 @@ ipcMain.handle('project:open', async () => {
   });
   if (canceled || filePaths.length === 0) return { canceled: true };
   const contents = await fs.readFile(filePaths[0], 'utf-8');
+  lastLevelPath = filePaths[0];
   return { canceled: false, filePath: filePaths[0], contents };
 });
 
@@ -211,6 +219,288 @@ ipcMain.handle('project:listDir', async (_event, relativeDir) => {
     // todavia), no un error: se devuelve vacio y la UI muestra el panel vacio.
     if (err.code === 'ENOENT') return [];
     throw err;
+  }
+});
+
+// --- Explorador de archivos -------------------------------------------------
+//
+// El explorador de la izquierda muestra la carpeta del proyecto entera, como el
+// de VS Code. Se lee UNA CARPETA POR VEZ, cuando se la despliega, y no el arbol
+// completo de una: recorrer en profundidad al abrir el proyecto significaria
+// entrar en node_modules (decenas de miles de archivos) y dejar la ventana
+// congelada varios segundos antes de mostrar nada. Con carga perezosa cada
+// despliegue cuesta un readdir y no se esconde ninguna carpeta.
+//
+// project:listDir sigue existiendo aparte, para los listados planos que piden
+// el desplegable de niveles y el panel de Recursos.
+
+ipcMain.handle('project:listEntries', async (_event, relativeDir) => {
+  if (!currentProjectRoot) {
+    return [];
+  }
+  const targetDir = resolveInProject(relativeDir || '.');
+  let entries;
+  try {
+    entries = await fs.readdir(targetDir, { withFileTypes: true });
+  } catch (err) {
+    // Una carpeta que ya no esta (la borraron por fuera) no es motivo para
+    // romper el explorador entero: esa rama queda vacia y el resto sigue.
+    if (err.code === 'ENOENT' || err.code === 'ENOTDIR') return [];
+    throw err;
+  }
+
+  const nodes = [];
+  for (const entry of entries) {
+    // Barras normales siempre: estas rutas viajan a la UI, que las compara
+    // contra prefijos como "levels/", y eso no puede depender del separador
+    // de Windows.
+    const relativePath = relativeDir ? `${relativeDir}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      nodes.push({ name: entry.name, path: relativePath, kind: 'dir' });
+    } else if (entry.isFile()) {
+      nodes.push({ name: entry.name, path: relativePath, kind: 'file' });
+    }
+  }
+
+  // Carpetas primero y alfabetico dentro de cada grupo, como cualquier
+  // explorador: el orden en que readdir devuelve las entradas depende del
+  // sistema de archivos y no es el que una persona espera leer.
+  nodes.sort((a, b) => (a.kind === b.kind ? a.name.localeCompare(b.name) : a.kind === 'dir' ? -1 : 1));
+  return nodes;
+});
+
+// --- Leer un archivo cualquiera para mirarlo --------------------------------
+//
+// project:readFile devuelve texto crudo y sirve para los .json que el editor
+// entiende. Este handler es para MIRAR cualquier archivo del proyecto: decide
+// por extension si se puede mostrar como texto, como imagen o si no se puede
+// mostrar, y corta lo que sea demasiado grande para meter en una ventana.
+
+const TEXT_FILE_NAMES = new Set([
+  '.gitignore', '.gitattributes', '.editorconfig', '.prettierrc', 'license', 'makefile',
+]);
+const TEXT_EXTENSIONS = new Set([
+  '.json', '.md', '.txt', '.ts', '.js', '.mjs', '.cjs', '.html', '.css', '.scss', '.cpp',
+  '.hpp', '.h', '.c', '.cc', '.cmake', '.yml', '.yaml', '.xml', '.svg', '.puml', '.cmd',
+  '.sh', '.bat', '.ps1', '.log', '.csv', '.ini', '.toml', '.gitignore',
+]);
+const IMAGE_MIME_TYPES = new Map([
+  ['.png', 'image/png'], ['.jpg', 'image/jpeg'], ['.jpeg', 'image/jpeg'],
+  ['.gif', 'image/gif'], ['.bmp', 'image/bmp'], ['.webp', 'image/webp'],
+]);
+
+/** Tope del texto que se manda a la UI. De sobra para leer un archivo, y evita mandar un log de 50 MB. */
+const TEXT_PREVIEW_LIMIT = 400 * 1024;
+/**
+ * Tope de imagen para el visor. En base64 ocupa un tercio mas y viaja entera
+ * dentro de un data: URL; 25 MB cubre de sobra una captura 4K en PNG.
+ */
+const IMAGE_PREVIEW_LIMIT = 25 * 1024 * 1024;
+
+// --- Importar una carpeta de imagenes como texturas -------------------------
+//
+// Las imagenes se COPIAN dentro de assets/textures/ del proyecto en vez de
+// referenciarse donde estan: el nivel guarda rutas relativas a assets/ y el
+// motor las resuelve contra esa carpeta (ver AssetResolver), asi que una
+// textura que viva fuera del proyecto se veria en el editor y saldria en negro
+// al ejecutar.
+//
+// Y se copian AJUSTADAS: el motor dibuja cada sprite al tamano de su recorte,
+// uno a uno, asi que una captura de 2377x1837 px ocuparia decenas de celdas
+// (los requisitos estan en src/app/core/texture-fit.ts).
+//
+// Va en tres pasos porque el ajuste lo hace la UI y no este proceso: hay que
+// decodificar la imagen, y el navegador decodifica PNG, JPG, GIF, WebP y BMP,
+// mientras que el nativeImage de Electron solo garantiza PNG y JPG.
+//
+//   1. project:beginImport           elige las carpetas y arma el plan
+//   2. project:readImportImage       la UI pide cada original, de a uno
+//   3. project:writeImportedTexture  y devuelve el PNG ajustado para escribir
+//
+// El plan queda guardado ACA, y los pasos 2 y 3 reciben solo un indice: la UI
+// nunca elige una ruta, asi que no puede leer ni pisar nada fuera de lo que la
+// persona eligio en los dialogos.
+
+let importSession = null;
+/** Tope del original que se acepta importar. */
+const IMAGE_IMPORT_LIMIT = 40 * 1024 * 1024;
+
+/**
+ * La raiz del proyecto cuando nadie abrio una a mano. Antes Importar se negaba
+ * de entrada sin carpeta de proyecto, y habia que ir a buscarla primero.
+ *
+ * Se prueba en orden: la carpeta del ultimo nivel abierto o guardado (un nivel
+ * vive en <raiz>/levels/), y despues el repositorio del propio editor, que
+ * corriendo desde el codigo esta en <raiz>/editor. Solo cuenta una carpeta con
+ * pinta de proyecto HoneyComb, o sea con assets/ o levels/ adentro.
+ */
+function inferProjectRoot() {
+  const candidates = [];
+  if (lastLevelPath && path.basename(path.dirname(lastLevelPath)).toLowerCase() === 'levels') {
+    candidates.push(path.dirname(path.dirname(lastLevelPath)));
+  }
+  if (!app.isPackaged) {
+    candidates.push(path.dirname(__dirname));
+  }
+  return (
+    candidates.find(
+      (dir) =>
+        fsSync.existsSync(path.join(dir, 'assets')) || fsSync.existsSync(path.join(dir, 'levels')),
+    ) ?? null
+  );
+}
+
+/** true si los dos archivos tienen exactamente los mismos bytes. */
+async function sameContents(a, b) {
+  const [statA, statB] = await Promise.all([fs.stat(a), fs.stat(b)]);
+  if (statA.size !== statB.size) return false;
+  const [bytesA, bytesB] = await Promise.all([fs.readFile(a), fs.readFile(b)]);
+  return bytesA.equals(bytesB);
+}
+
+ipcMain.handle('project:beginImport', async () => {
+  if (!currentProjectRoot) {
+    currentProjectRoot = inferProjectRoot();
+  }
+  // Solo si no se pudo deducir se pregunta, y en el mismo gesto: el dialogo de
+  // la carpeta de imagenes viene justo despues, sin volver a tocar Importar.
+  if (!currentProjectRoot) {
+    const project = await dialog.showOpenDialog({
+      title: 'Elegi la carpeta del proyecto (las imagenes van a su assets/textures)',
+      properties: ['openDirectory'],
+    });
+    if (project.canceled || project.filePaths.length === 0) return null;
+    currentProjectRoot = project.filePaths[0];
+  }
+
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    title: 'Elegi la carpeta con las imagenes',
+    properties: ['openDirectory'],
+  });
+  // La raiz se devuelve igual: pudo haberse deducido recien, y la UI tiene que
+  // enterarse aunque la persona cancele el segundo dialogo.
+  if (canceled || filePaths.length === 0) {
+    return { projectRoot: currentProjectRoot, canceled: true };
+  }
+
+  const folder = filePaths[0];
+  const targetFolder = path.join(currentProjectRoot, 'assets', 'textures');
+  await fs.mkdir(targetFolder, { recursive: true });
+
+  const entries = await fs.readdir(folder, { withFileTypes: true });
+  const items = [];
+  for (const entry of entries) {
+    const extension = path.extname(entry.name).toLowerCase();
+    if (!entry.isFile() || !IMAGE_MIME_TYPES.has(extension)) continue;
+
+    // Todo sale como PNG: es el formato que el motor carga seguro.
+    const target = path.basename(entry.name, extension) + '.png';
+    const sourcePath = path.join(folder, entry.name);
+    const targetPath = path.join(targetFolder, target);
+
+    //   new     no hay nada con ese nombre
+    //   stale   hay una copia CRUDA de esta misma imagen, byte a byte, que dejo
+    //           una importacion vieja que no ajustaba el tamano: se puede
+    //           reemplazar por la version ajustada sin perder nada
+    //   exists  hay OTRA imagen con ese nombre, y esa no se pisa
+    let status = 'new';
+    if (fsSync.existsSync(targetPath)) {
+      status = (await sameContents(sourcePath, targetPath)) ? 'stale' : 'exists';
+    }
+    items.push({ source: entry.name, target, status });
+  }
+
+  importSession = { folder, targetFolder, items };
+  return { projectRoot: currentProjectRoot, canceled: false, folder, items };
+});
+
+function importItem(index) {
+  const item = importSession?.items[index];
+  if (!item) {
+    throw new Error('La importacion ya no esta activa. Volve a empezarla.');
+  }
+  return item;
+}
+
+ipcMain.handle('project:readImportImage', async (_event, index) => {
+  const item = importItem(index);
+  const sourcePath = path.join(importSession.folder, item.source);
+  const stats = await fs.stat(sourcePath);
+  if (stats.size > IMAGE_IMPORT_LIMIT) {
+    throw new Error(`${item.source} pesa demasiado para importarla.`);
+  }
+  const bytes = await fs.readFile(sourcePath);
+  const mimeType = IMAGE_MIME_TYPES.get(path.extname(item.source).toLowerCase());
+  return `data:${mimeType};base64,${bytes.toString('base64')}`;
+});
+
+// pngBase64 en null significa "copiar el original tal cual", y solo se acepta
+// para un PNG: cualquier otro formato tiene que llegar convertido, o quedaria
+// un JPG con extension .png que el motor no sabria abrir.
+ipcMain.handle('project:writeImportedTexture', async (_event, { index, pngBase64 }) => {
+  const item = importItem(index);
+  if (item.status === 'exists') {
+    return { written: false };
+  }
+
+  const sourcePath = path.join(importSession.folder, item.source);
+  if (pngBase64 === null && path.extname(item.source).toLowerCase() !== '.png') {
+    throw new Error(`${item.source} no es PNG: tiene que convertirse antes de copiarse.`);
+  }
+  const bytes =
+    pngBase64 === null ? await fs.readFile(sourcePath) : Buffer.from(pngBase64, 'base64');
+
+  try {
+    // "wx" falla si el archivo ya existe: dos imagenes de la carpeta que salen
+    // con el mismo nombre (sprite.jpg y sprite.png) no se pisan entre si. Solo
+    // una copia cruda vieja ("stale") se sobrescribe.
+    await fs.writeFile(path.join(importSession.targetFolder, item.target), bytes, {
+      flag: item.status === 'stale' ? 'w' : 'wx',
+    });
+    return { written: true };
+  } catch (err) {
+    if (err.code === 'EEXIST') return { written: false };
+    throw err;
+  }
+});
+
+ipcMain.handle('project:readFileData', async (_event, relativePath) => {
+  const targetPath = resolveInProject(relativePath);
+  const stats = await fs.stat(targetPath);
+  const extension = path.extname(targetPath).toLowerCase();
+  const name = path.basename(targetPath).toLowerCase();
+
+  const mimeType = IMAGE_MIME_TYPES.get(extension);
+  if (mimeType) {
+    if (stats.size > IMAGE_PREVIEW_LIMIT) {
+      return { kind: 'binary', size: stats.size, reason: 'too-large' };
+    }
+    const bytes = await fs.readFile(targetPath);
+    return {
+      kind: 'image',
+      size: stats.size,
+      dataUrl: `data:${mimeType};base64,${bytes.toString('base64')}`,
+    };
+  }
+
+  if (!TEXT_EXTENSIONS.has(extension) && !TEXT_FILE_NAMES.has(name)) {
+    return { kind: 'binary', size: stats.size, reason: 'unsupported' };
+  }
+
+  // Se lee solo el principio y no el archivo entero: un .log grande no tiene
+  // por que entrar en memoria para ver sus primeras lineas.
+  const handle = await fs.open(targetPath, 'r');
+  try {
+    const buffer = Buffer.alloc(Math.min(stats.size, TEXT_PREVIEW_LIMIT));
+    await handle.read(buffer, 0, buffer.length, 0);
+    return {
+      kind: 'text',
+      size: stats.size,
+      text: buffer.toString('utf-8'),
+      truncated: stats.size > buffer.length,
+    };
+  } finally {
+    await handle.close();
   }
 });
 

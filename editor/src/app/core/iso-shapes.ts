@@ -19,6 +19,7 @@
 // la casilla: ese tiene que apoyar el CENTRO del rombo de su base, medio tile
 // mas abajo. El offset es esa diferencia.
 
+import { ColliderConfig } from '../models/level.model';
 import {
   SHAPE_CELLS,
   SHAPE_SHEET_DATA_URL,
@@ -56,4 +57,35 @@ export function shapeOf(entity: { type: string; texture: string }): ShapeDef | u
   return entity.texture === SHAPE_TEXTURE || entity.texture.endsWith('/' + SHAPE_TEXTURE)
     ? shapeDef(entity.type)
     : undefined;
+}
+
+/**
+ * El collider de una figura, en el formato del contrato: ancho y alto en
+ * pixeles, y solido.
+ *
+ * COMO LO USA EL MOTOR. Para bloquear, main.cpp divide el collider por el
+ * tamano del tile y lo trata como una caja en CELDAS centrada en la casilla.
+ * O sea que 64x32 en un tile de 64x32 es exactamente el rombo de una celda,
+ * que es lo que traen las figuras de levels/figuras.json.
+ *
+ * DE DONDE SALE EL TAMANO. De la huella real de cada figura, la misma con la
+ * que el generador la dibuja: un cubo llena su casilla, pero un pilar se
+ * levanta sobre una base de 0.42 celdas, y bloquearle la casilla entera haria
+ * chocar al jugador contra aire.
+ *
+ * Solido porque una figura es un volumen: se choca contra ella, no se la cruza.
+ *
+ * "span" es cuantas celdas por lado ocupa la figura agrandada: la huella crece
+ * en la misma proporcion, porque el motor agranda el sprite entero.
+ */
+export function shapeCollider(
+  def: ShapeDef,
+  tile: { tileWidth: number; tileHeight: number },
+  span = 1,
+): ColliderConfig {
+  return {
+    width: Math.max(1, Math.round(def.footprint * span * tile.tileWidth)),
+    height: Math.max(1, Math.round(def.footprint * span * tile.tileHeight)),
+    solid: true,
+  };
 }

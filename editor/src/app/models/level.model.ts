@@ -53,6 +53,12 @@ export interface LevelEntity {
    * centra el tile de piso.
    */
   groundOffset?: number;
+  /**
+   * Celdas por lado que ocupa, a partir de position hacia +col y +row. Ausente
+   * = 1. El motor agranda el sprite span veces y lo centra en el bloque; el
+   * collider ya viene del tamano del bloque entero.
+   */
+  span?: number;
   /** Ausente si la entidad no colisiona. */
   collider?: ColliderConfig;
 }

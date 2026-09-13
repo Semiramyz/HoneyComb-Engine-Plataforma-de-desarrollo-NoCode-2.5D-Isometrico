@@ -23,6 +23,10 @@ struct LevelEntity {
     // solido que llena la casilla usa este campo para apoyar el centro del
     // rombo de su base ahi, que es donde se centra el tile de piso.
     float groundOffset = 0.0f;
+    // Celdas por lado que ocupa, desde position hacia +col y +row. El sprite
+    // se agranda span veces y se apoya en el centro del bloque; el collider
+    // ya viene del tamano del bloque entero. 1 = una casilla.
+    int span = 1;
     Vector2 colliderSize;        // {0,0} si la entidad no colisiona
     bool colliderSolid = false;  // true si el collider bloquea el movimiento
     bool destroyed = false;      // borrado suave: la accion destroy_entity solo marca esto

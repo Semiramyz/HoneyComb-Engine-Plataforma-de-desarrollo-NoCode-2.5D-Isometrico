@@ -23,7 +23,7 @@ const sheetSource = readFileSync(
 );
 const cells = [
   ...sheetSource.matchAll(
-    /id: '(\w+)',[\s\S]*?sourceRect: \{ x: (\d+), y: (\d+), width: (\d+), height: (\d+) \},\s*groundOffset: (\d+),/g,
+    /id: '(\w+)',[\s\S]*?sourceRect: \{ x: (\d+), y: (\d+), width: (\d+), height: (\d+) \},\s*groundOffset: (\d+),\s*footprint: ([\d.]+),/g,
   ),
 ].map((m) => ({
   id: m[1],
@@ -32,6 +32,7 @@ const cells = [
   w: +m[4],
   h: +m[5],
   groundOffset: +m[6],
+  footprint: +m[7],
 }));
 
 if (cells.length === 0) {
@@ -79,6 +80,14 @@ const entities = [
     texture: 'textures/shapes.png',
     sourceRect: { x: cell.x, y: cell.y, width: cell.w, height: cell.h },
     groundOffset: cell.groundOffset,
+    // La misma cuenta que shapeCollider() en el editor: la huella de la base,
+    // en pixeles de un tile de 64x32, y solida. Sin collider las figuras se
+    // dibujaban pero el jugador las atravesaba.
+    collider: {
+      width: Math.max(1, Math.round(cell.footprint * 64)),
+      height: Math.max(1, Math.round(cell.footprint * 32)),
+      solid: true,
+    },
   })),
 ];
 

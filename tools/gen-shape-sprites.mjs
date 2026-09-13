@@ -404,6 +404,7 @@ const entries = cells
       `    height: ${cell.height},\n` +
       `    sourceRect: { x: ${cell.x}, y: ${cell.y}, width: ${CELL_W}, height: ${CELL_H} },\n` +
       `    groundOffset: ${GROUND_OFFSET},\n` +
+      `    footprint: ${cell.width},\n` +
       `  },`,
   )
   .join('\n');
@@ -441,6 +442,12 @@ export interface ShapeCell {
    * "groundOffset" del nivel; ver el calculo en el generador.
    */
   groundOffset: number;
+  /**
+   * Ancho de la base en celdas: 1 llena la casilla, 0.42 es la base angosta
+   * del pilar. Es la huella con la que la figura choca, y de aca sale el
+   * "collider" que el editor le pone al colocarla (ver shapeCollider).
+   */
+  footprint: number;
 }
 
 export const SHAPE_CELLS: readonly ShapeCell[] = [

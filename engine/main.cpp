@@ -361,9 +361,14 @@ int main(int argc, char *argv[])
                                             static_cast<float>(level.grid.GetTileWidth()) / 2.0f;
                     float entityHalfHeight = entity.colliderSize.y /
                                              static_cast<float>(level.grid.GetTileHeight()) / 2.0f;
-                    if (std::fabs(candidate.x - entity.precisePosition.x) <
+                    // Una entidad de span N ocupa un bloque de NxN celdas desde
+                    // su celda, asi que su caja se centra en el medio de ese
+                    // bloque y no en la celda de origen. El tamano no se toca:
+                    // el collider ya viene del bloque entero.
+                    float entitySpanOffset = (entity.span - 1) / 2.0f;
+                    if (std::fabs(candidate.x - (entity.precisePosition.x + entitySpanOffset)) <
                             playerHalfWidth + entityHalfWidth &&
-                        std::fabs(candidate.y - entity.precisePosition.y) <
+                        std::fabs(candidate.y - (entity.precisePosition.y + entitySpanOffset)) <
                             playerHalfHeight + entityHalfHeight)
                     {
                         blocked = true;
@@ -477,7 +482,14 @@ int main(int argc, char *argv[])
                 sourceRect = animIt->second.GetCurrentFrame();
             }
 
-            Vector2 sortPosition = gridToScreen(entity.precisePosition);
+            // Una entidad de span N ocupa NxN celdas a partir de su celda y se
+            // apoya en el CENTRO de ese bloque, (N-1)/2 celdas mas adelante en
+            // las dos direcciones. Con span 1 el offset es 0 y nada cambia.
+            float spanOffset = (entity.span - 1) / 2.0f;
+            float spanScale = static_cast<float>(entity.span);
+            Vector2 sortPosition = gridToScreen(Vector2{
+                entity.precisePosition.x + spanOffset,
+                entity.precisePosition.y + spanOffset});
 
             // El sprite se apoya en el suelo: centrado en X y con los "pies"
             // sobre el punto de la celda, por eso se resta el alto completo.
@@ -488,9 +500,14 @@ int main(int argc, char *argv[])
             // tile y apoyar el centro del rombo de su base en el punto de la
             // celda, que es donde se centra el tile de piso. Sin esto un cubo
             // flota medio tile sobre el suelo.
+            //
+            // Con span, el sprite se agranda span veces y el groundOffset con
+            // el, porque esta medido en pixeles del sprite original.
+            float drawWidth = sourceRect.width * spanScale;
+            float drawHeight = sourceRect.height * spanScale;
             Vector2 drawPosition{
-                sortPosition.x - sourceRect.width / 2.0f,
-                sortPosition.y - sourceRect.height + entity.groundOffset};
+                sortPosition.x - drawWidth / 2.0f,
+                sortPosition.y - drawHeight + entity.groundOffset * spanScale};
             // Tinte de depuracion, mientras no haya arte propio por tipo.
             Color tint = entity.type == "obstacle" ? RED : WHITE;
 
@@ -505,7 +522,11 @@ int main(int argc, char *argv[])
                 Vector2{0, 0},
                 0.0f,
                 tint,
-                SpriteLayer::Entity
+                SpriteLayer::Entity,
+
+                // Tamano de dibujo: el del sprite por su span. Con span 1 es el
+                // mismo tamano del recorte, o sea lo de siempre.
+                Vector2{drawWidth, drawHeight}
             });
             // Los colliders se encolan en este mismo recorrido para no volver a
             // iterar el vector; CollisionSystem los cruza todos contra todos

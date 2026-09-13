@@ -29,6 +29,13 @@
       <span class="brand__name">HoneyComb</span>
     </div>
 
+    <!-- Los dos paneles laterales se esconden desde aca. Van juntos y con el
+         icono del lado que apagan, para que se lean como un par. -->
+    <button class="menu" [class.is-active]="sidebarVisible()" (click)="toggleSidebar()"
+            title="Mostrar u ocultar el panel izquierdo (Ctrl+B)">☰</button>
+    <button class="menu" [class.is-active]="inspectorVisible()" (click)="toggleInspector()"
+            title="Mostrar u ocultar el panel de propiedades">⚙</button>
+
     <button class="menu" (click)="openLevelFile()" title="Abrir un archivo .json de nivel (Ctrl+O)">
       Abrir nivel
     </button>
@@ -61,6 +68,10 @@
       </button>
       <button class="wstab" [class.is-active]="workspace() === 'salida'" (click)="workspace.set('salida')">
         Salida
+      </button>
+      <button class="wstab" [class.is-active]="workspace() === 'archivo'" (click)="workspace.set('archivo')"
+              title="Ver el archivo abierto desde el explorador">
+        Archivo
       </button>
     </nav>
 
@@ -141,59 +152,240 @@
     </div>
   }
 
-  <!-- ===================== CUERPO: TRES AREAS ===================== -->
-  <div class="body">
-    <!-- --------- AREA IZQUIERDA: outliner + recursos --------- -->
-    <div class="stack">
-      <section class="area">
-        <div class="area__head">
-          <span class="area__kind" title="Outliner">☰</span>
-          <span class="area__title">Escena</span>
-          <div class="head__spacer"></div>
-          <span class="area__title">{{ entities().length }}</span>
+  <!-- Celda ocupada. Antes se apilaba sin avisar y las dos entidades quedaban
+       una encima de la otra tapandose: se veia una sola, y la de abajo aparecia
+       solo en el outliner. "Reemplazar" va primero porque es lo que uno suele
+       querer al volver a colocar algo en la misma casilla. -->
+  @if (pendingPlacement()) {
+    <div class="modal-backdrop" (click)="cancelPending()">
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="occupied-title"
+               (click)="$event.stopPropagation()">
+        <div class="modal__head">
+          <h2 id="occupied-title">Esa celda ya esta ocupada</h2>
+          <button class="icon-button" type="button" title="Cancelar" (click)="cancelPending()">×</button>
         </div>
 
-        <div class="area__body tree">
-          <!-- Raiz del arbol: deseleccionar todo. Las entidades cuelgan de ella
-               con sangria, como los objetos bajo una coleccion en Blender. -->
-          <button class="tree__item tree__item--root" [class.is-active]="!selected()"
-                  (click)="selectEntity(null)">
-            <span class="tree__icon">▾</span>{{ levels.level().name }}
-          </button>
+        <div class="modal__body">
+          <p class="hint">{{ pendingSummary() }}</p>
+        </div>
 
-          @for (entity of entities(); track entity.id) {
-            <button class="tree__item tree__item--child"
-                    [class.is-active]="selected()?.id === entity.id"
-                    (click)="selectEntity(entity.id)">
-              <span class="tree__icon tree__icon--{{ entity.type }}">▣</span>
-              <span class="tree__label">{{ entity.id }}</span>
-              <span class="tree__meta">{{ entity.position.col }},{{ entity.position.row }}</span>
-            </button>
-          } @empty {
-            <p class="empty">Sin entidades. Elige una textura y usa la herramienta Colocar.</p>
-          }
+        <div class="modal__actions">
+          <button class="btn" type="button" (click)="cancelPending()">Cancelar</button>
+          <button class="btn" type="button" (click)="stackPending()"
+                  title="Deja las dos en la misma celda, una encima de la otra">Superponer</button>
+          <button class="btn btn--primary" type="button" (click)="replacePending()">Reemplazar</button>
         </div>
       </section>
+    </div>
+  }
 
+  <!-- Menu del clic derecho sobre una entidad. Va centrado y no pegado al
+       cursor: ahora tiene controles de verdad (el tamano de una figura), y el
+       menu chico junto al puntero se cerraba con cualquier roce del mouse.
+       La casilla Pared es un solo booleano del contrato (collider.solid). -->
+  @if (contextMenuEntity(); as entity) {
+    <div class="modal-backdrop" (click)="closeContextMenu()">
+      <section class="modal" role="dialog" aria-modal="true" aria-labelledby="entity-menu-title"
+               (click)="$event.stopPropagation()">
+        <div class="modal__head">
+          <h2 id="entity-menu-title">{{ entity.id }}</h2>
+          <button class="icon-button" type="button" title="Cerrar" (click)="closeContextMenu()">×</button>
+        </div>
+
+        <div class="modal__body">
+          @if (isShape(entity)) {
+            <div class="field">
+              <span>Tamaño en celdas</span>
+              <div class="seg">
+                @for (size of spanChoices; track size) {
+                  <button class="tool" type="button" [class.is-active]="spanOf(entity) === size"
+                          (click)="setSpan(entity.id, size)">
+                    {{ size }}×{{ size }}
+                  </button>
+                }
+              </div>
+            </div>
+            <label class="field">
+              <span>Otro tamaño</span>
+              <input class="input" type="number" min="1" step="1" [max]="maxSpan()"
+                     [value]="spanOf(entity)" (change)="setSpan(entity.id, int($event))" />
+            </label>
+            <p class="hint">
+              Ocupa de {{ entity.position.col }},{{ entity.position.row }} a
+              {{ entity.position.col + spanOf(entity) - 1 }},{{ entity.position.row + spanOf(entity) - 1 }}.
+              Su colision crece con ella.
+            </p>
+            @if (overlapIds(entity).length > 0) {
+              <p class="hint hint--warn">Se superpone con: {{ overlapIds(entity).join(', ') }}.</p>
+            }
+          }
+
+          <label class="check">
+            <input type="checkbox" [checked]="isWall(entity)"
+                   (change)="setWall(entity.id, checked($event))" />
+            <span>Pared — {{ isWall(entity) ? 'bloquea el paso' : 'se atraviesa' }}</span>
+          </label>
+        </div>
+
+        <div class="modal__actions">
+          <button class="btn btn--primary" type="button" (click)="closeContextMenu()">Listo</button>
+        </div>
+      </section>
+    </div>
+  }
+
+  <!-- ===================== CUERPO: TRES AREAS =====================
+       El ancho de la barra lateral sale de un signal y se inyecta en las
+       columnas del grid, asi que arrastrar su borde o esconderla con Ctrl+B no
+       necesita tocar el DOM a mano: cambia el signal y el layout se recalcula.
+       Con la barra oculta esa columna directamente no existe. -->
+  <div class="body" [style.grid-template-columns]="bodyColumns()">
+    <!-- --------- AREA IZQUIERDA: outliner + paletas --------- -->
+    @if (sidebarVisible()) {
+    <div class="stack" [style.grid-template-rows]="sidebarRows()">
+      <!-- Borde arrastrable, como el de VS Code. Va dentro de la barra y
+           posicionado sobre su canto derecho para no ocupar una columna
+           propia del grid. -->
+      <div class="grip grip--right" [class.is-active]="isResizing('sidebar')"
+           title="Arrastra para cambiar el ancho"
+           (pointerdown)="onResizeStart('sidebar', $event)"
+           (pointermove)="onResizeMove($event)"
+           (pointerup)="onResizeEnd($event)"
+           (pointercancel)="onResizeEnd($event)"></div>
+      <!-- Un area, dos editores. Las pestanas de la cabecera no abren otra
+           pantalla: cambian QUE editor ocupa este espacio, igual que el
+           selector de tipo de editor de Blender. "Escena" es el outliner de
+           entidades del nivel abierto; "Proyecto", el organizador de archivos
+           de la carpeta del proyecto (levels/, assets/, schema/). -->
       <section class="area">
         <div class="area__head">
-          <span class="area__kind" title="Asset Browser">▦</span>
+          <!-- Plegar la seccion, como en VS Code. Elegir una de las dos
+               pestanas de al lado la vuelve a desplegar. -->
+          <button class="area__toggle" type="button" [class.is-collapsed]="isCollapsed('side-main')"
+                  [attr.aria-expanded]="!isCollapsed('side-main')"
+                  (click)="togglePanel('side-main')" title="Plegar o desplegar esta seccion">
+            <span class="area__chevron">▾</span>
+          </button>
+          <div class="seg">
+            <button class="tool" [class.is-active]="leftEditor() === 'escena'"
+                    (click)="setLeftEditor('escena')" title="Escena: entidades del nivel abierto">☰</button>
+            <button class="tool" [class.is-active]="leftEditor() === 'proyecto'"
+                    (click)="setLeftEditor('proyecto')" title="Proyecto: archivos en disco">🗀</button>
+          </div>
+          <span class="area__title">{{ leftEditor() === 'escena' ? 'Escena' : 'Proyecto' }}</span>
+          <div class="head__spacer"></div>
+          @if (leftEditor() === 'escena') {
+            <span class="area__title">{{ entities().length }}</span>
+          } @else {
+            <button class="tool" (click)="refreshTree()" title="Releer la carpeta del proyecto">⟳</button>
+          }
+        </div>
+
+        @if (!isCollapsed('side-main') && leftEditor() === 'escena') {
+          <div class="area__body tree">
+            <!-- Raiz del arbol: deseleccionar todo. Las entidades cuelgan de ella
+                 con sangria, como los objetos bajo una coleccion en Blender. -->
+            <button class="tree__item tree__item--root" [class.is-active]="!selected()"
+                    (click)="selectEntity(null)">
+              <span class="tree__icon">▾</span>{{ levels.level().name }}
+            </button>
+
+            <!-- Ctrl+clic suma o quita una fila, Shift+clic selecciona el rango
+                 desde la activa: las mismas reglas que cualquier lista de
+                 escritorio. "is-active" pinta toda la seleccion; "is-current",
+                 solo la que esta mostrando el inspector. -->
+            @for (entity of entities(); track entity.id) {
+              <button class="tree__item tree__item--child"
+                      [class.is-active]="isEntitySelected(entity.id)"
+                      [class.is-current]="selected()?.id === entity.id"
+                      (click)="onOutlinerClick(entity.id, $event)">
+                <span class="tree__icon tree__icon--{{ entity.type }}">▣</span>
+                <span class="tree__label">{{ entity.id }}</span>
+                <span class="tree__meta">{{ entity.position.col }},{{ entity.position.row }}</span>
+              </button>
+            } @empty {
+              <p class="empty">Sin entidades. Elige una textura y usa la herramienta Colocar.</p>
+            }
+          </div>
+        } @else if (!isCollapsed('side-main')) {
+          <div class="area__body filetree">
+            <!-- Los dos puntos de entrada del panel: elegir una escena ya
+                 existente con el dialogo del sistema (sirva o no la carpeta
+                 abierta), y cambiar cual es la carpeta del proyecto. -->
+            <div class="filetools">
+              <button class="btn btn--small" (click)="openLevelFile()"
+                      title="Elegir un archivo .json de nivel (Ctrl+O)">Abrir escena…</button>
+              <button class="btn btn--small" (click)="openProject()"
+                      title="Elegir la carpeta raiz del proyecto">Carpeta…</button>
+            </div>
+
+            <!-- Una sola lista plana: la sangria la da la profundidad que
+                 calculo projectRows(). Cada fila es un boton porque todas
+                 hacen algo -- abrir la carpeta, cargar el nivel, elegir la
+                 textura, o mostrar el archivo en el visor de abajo. -->
+            @for (row of projectRows(); track row.node.path) {
+              <button class="tree__item filerow"
+                      [class.is-active]="isOpenLevel(row.node) || isOpenFile(row.node)"
+                      [class.filerow--dir]="row.node.kind === 'dir'"
+                      [style.padding-left.px]="8 + row.depth * 12"
+                      [title]="row.node.path"
+                      (click)="openTreeEntry(row.node)">
+                <span class="tree__icon">{{ treeGlyph(row.node) }}</span>
+                <span class="tree__label">{{ row.node.name }}</span>
+              </button>
+            } @empty {
+              <p class="empty">
+                Sin proyecto abierto. Usa “Carpeta…” y elige la raiz: la carpeta que contiene
+                levels/, assets/ y schema/.
+              </p>
+            }
+          </div>
+        }
+      </section>
+
+      <!-- Texturas del proyecto. "Importar…" copia una carpeta de imagenes a
+           assets/textures/, y desde ahi cada una se puede arrastrar sobre una
+           entidad del viewport para cambiarle el arte, o sobre una celda vacia
+           para crear una entidad nueva con ella. -->
+      <section class="area">
+        <div class="area__head">
+          <button class="area__toggle" type="button" [class.is-collapsed]="isCollapsed('side-assets')"
+                  [attr.aria-expanded]="!isCollapsed('side-assets')"
+                  (click)="togglePanel('side-assets')" title="Plegar o desplegar Recursos">
+            <span class="area__chevron">▾</span>▦
+          </button>
           <span class="area__title">Recursos</span>
           <div class="head__spacer"></div>
           <span class="area__title">{{ textures().length }}</span>
+          <button class="tool" [disabled]="importing()" (click)="importTextures()"
+                  title="Copiar a assets/textures/ las imagenes de una carpeta, ajustadas al tamano de un tile">
+            {{ importing() ? 'Importando…' : 'Importar…' }}
+          </button>
         </div>
 
-        <div class="area__body assets">
+        @if (!isCollapsed('side-assets')) {
+        <div class="area__body assets" [class.assets--fill]="isCollapsed('side-main')">
           @for (texture of textures(); track texture) {
             <button class="asset" [class.is-active]="activeTexture() === texture"
-                    (click)="selectTexture(texture)" [title]="texture">
-              <span class="asset__thumb"></span>
+                    draggable="true"
+                    (dragstart)="onTextureDragStart($event, texture)"
+                    (click)="selectTexture(texture)"
+                    [title]="texture + ' — arrastra sobre una entidad para cambiarle la textura'">
+              <span class="asset__thumb">
+                @if (textureAssets()[texture]; as asset) {
+                  <img class="asset__img" [src]="asset.dataUrl" [alt]="texture" />
+                }
+              </span>
               <span class="asset__name">{{ texture }}</span>
             </button>
           } @empty {
-            <p class="empty">assets/textures/ vacio o proyecto sin abrir.</p>
+            <p class="empty">
+              assets/textures/ vacio o proyecto sin abrir. Usa “Importar…” para traer una carpeta
+              de imagenes.
+            </p>
           }
         </div>
+        }
       </section>
 
       <!-- Primitivas de bloqueo. Se pueden arrastrar al viewport o clickear
@@ -202,12 +394,17 @@
            dibuja en el canvas (ver core/iso-shapes.ts). -->
       <section class="area">
         <div class="area__head">
-          <span class="area__kind" title="Primitivas">◆</span>
+          <button class="area__toggle" type="button" [class.is-collapsed]="isCollapsed('side-shapes')"
+                  [attr.aria-expanded]="!isCollapsed('side-shapes')"
+                  (click)="togglePanel('side-shapes')" title="Plegar o desplegar Figuras">
+            <span class="area__chevron">▾</span>◆
+          </button>
           <span class="area__title">Figuras</span>
           <div class="head__spacer"></div>
           <span class="area__title">arrastra a la grilla</span>
         </div>
 
+        @if (!isCollapsed('side-shapes')) {
         <div class="area__body shapes">
           @for (shape of shapes; track shape.id) {
             <button
@@ -227,8 +424,47 @@
             </button>
           }
         </div>
+        }
+      </section>
+
+      <!-- Arquetipos de personaje. Funcionan igual que las figuras -- clic para
+           elegir, o arrastrar a la grilla -- pero lo que colocan es una entidad
+           con su type, su collider y su clip de animacion ya puestos como los
+           espera el motor (ver core/characters.ts). -->
+      <section class="area">
+        <div class="area__head">
+          <button class="area__toggle" type="button" [class.is-collapsed]="isCollapsed('side-characters')"
+                  [attr.aria-expanded]="!isCollapsed('side-characters')"
+                  (click)="togglePanel('side-characters')" title="Plegar o desplegar Personajes">
+            <span class="area__chevron">▾</span>☻
+          </button>
+          <span class="area__title">Personajes</span>
+          <div class="head__spacer"></div>
+          <span class="area__title">arrastra a la grilla</span>
+        </div>
+
+        @if (!isCollapsed('side-characters')) {
+        <div class="area__body shapes">
+          @for (character of characters; track character.id) {
+            <button
+              class="shape"
+              [class.is-active]="activeCharacter() === character.id"
+              draggable="true"
+              [title]="character.hint"
+              (dragstart)="onCharacterDragStart($event, character.id)"
+              (click)="selectCharacter(character.id)"
+            >
+              <span class="shape__icon character__icon" [style.background]="character.color">
+                {{ character.glyph }}
+              </span>
+              <span class="shape__name">{{ character.label }}</span>
+            </button>
+          }
+        </div>
+        }
       </section>
     </div>
+    }
 
     <!-- --------- AREA CENTRAL: viewport isometrico --------- -->
     <section class="area viewport">
@@ -236,14 +472,14 @@
         <span class="area__kind" title="Viewport isometrico">⊞</span>
 
         <div class="seg">
-          <button class="tool" [class.is-active]="tool() === 'select'" (click)="tool.set('select')"
-                  title="Seleccionar">▶</button>
-          <button class="tool" [class.is-active]="tool() === 'place'" (click)="tool.set('place')"
-                  title="Colocar entidad">✚</button>
-          <button class="tool" [class.is-active]="tool() === 'floor'" (click)="tool.set('floor')"
-                  title="Alternar piso">▱</button>
-          <button class="tool" [class.is-active]="tool() === 'wall'" (click)="tool.set('wall')"
-                  title="Alternar pared">▥</button>
+          <button class="tool" [class.is-active]="tool() === 'select'" (click)="setTool('select')"
+                  title="Seleccionar: clic sobre una entidad">▶</button>
+          <button class="tool" [class.is-active]="tool() === 'place'" (click)="setTool('place')"
+                  title="Colocar entidad: textura o figura elegida">✚</button>
+          <button class="tool" [class.is-active]="tool() === 'floor'" (click)="setTool('floor')"
+                  title="Alternar piso: una celda sin suelo no se puede pisar">▱</button>
+          <button class="tool" [class.is-active]="tool() === 'wall'" (click)="setTool('wall')"
+                  title="Alternar pared: bloquea el paso en esa celda">▥</button>
         </div>
 
         <span class="head__sep"></span>
@@ -283,6 +519,7 @@
           class="canvas"
           [class.canvas--place]="tool() !== 'select'"
           [class.canvas--panning]="panning()"
+          [class.canvas--moving]="moving()"
           (pointerdown)="onPointerDown($event)"
           (pointermove)="onPointerMove($event)"
           (pointerup)="onPointerUp($event)"
@@ -303,32 +540,16 @@
           }
         </div>
 
-        <!-- Menu contextual del click derecho sobre una entidad.
-             Un solo check porque detras hay un solo booleano del contrato
-             (collider.solid): marcado bloquea el paso, desmarcado se
-             atraviesa. Dos casillas excluyentes para lo mismo solo daban a
-             entender que podian estar las dos apagadas. -->
-        @if (contextMenu(); as menu) {
-          @if (contextMenuEntity(); as entity) {
-            <div class="ctxmenu" [style.left.px]="menu.x" [style.top.px]="menu.y">
-              <div class="ctxmenu__title">{{ entity.id }}</div>
-
-              <label class="ctxmenu__item">
-                <input type="checkbox" [checked]="isWall(entity)"
-                       (change)="setWall(entity.id, checked($event))" />
-                <span>Pared</span>
-                <em>{{ isWall(entity) ? 'bloquea el paso' : 'se atraviesa' }}</em>
-              </label>
-            </div>
-          }
-        }
 
         <div class="vp-chips">
           @if (hovered(); as cell) {
             <span>{{ cell.col }}, {{ cell.row }}</span>
           }
           @if (tool() === 'place') {
-            <span>colocar · {{ activeShape() ?? activeTexture() ?? 'nada elegido' }}</span>
+            <span>colocar · {{ activeCharacterLabel() ?? activeShape() ?? activeTexture() ?? 'nada elegido' }}</span>
+          }
+          @if (selectionCount() > 1) {
+            <span>{{ selectionCount() }} seleccionadas</span>
           }
         </div>
       </div>
@@ -339,7 +560,16 @@
          plegables a la derecha, como el Properties editor de Blender. Cada
          control escribe con un patch* del componente, nunca directo sobre el
          objeto del nivel. -->
-    <section class="area">
+    @if (inspectorVisible()) {
+    <section class="area inspector">
+      <!-- Mismo borde arrastrable que el panel izquierdo, en su canto interno. -->
+      <div class="grip grip--left" [class.is-active]="isResizing('inspector')"
+           title="Arrastra para cambiar el ancho"
+           (pointerdown)="onResizeStart('inspector', $event)"
+           (pointermove)="onResizeMove($event)"
+           (pointerup)="onResizeEnd($event)"
+           (pointercancel)="onResizeEnd($event)"></div>
+
       <div class="area__head">
         <span class="area__kind" title="Propiedades">⚙</span>
         <span class="area__title">Propiedades</span>
@@ -356,6 +586,18 @@
         <div class="props__body">
           @if (inspectorTab() === 'objeto') {
             @if (selected(); as entity) {
+              <!-- Con varias seleccionadas los campos siguen mostrando UNA (no
+                   se pueden mostrar dos valores en el mismo campo), asi que
+                   hay que decir cual y cuantas hay detras: lo que se escriba
+                   arriba cambia solo la activa, mientras que los botones del
+                   final y la casilla de pared van a todas. -->
+              @if (selectionCount() > 1) {
+                <p class="hint hint--warn">
+                  {{ selectionCount() }} entidades seleccionadas. Los campos editan “{{ entity.id }}”;
+                  Duplicar, Eliminar y Pared actuan sobre todas.
+                </p>
+              }
+
               <section class="panel">
                 <button class="panel__head" (click)="togglePanel('obj')">
                   <span class="panel__arrow" [class.panel__arrow--collapsed]="isCollapsed('obj')">▶</span>
@@ -453,7 +695,7 @@
                          inspector es donde uno la busca. -->
                     <label class="check" style="margin-top: 6px">
                       <input type="checkbox" [checked]="isWall(entity)"
-                             (change)="setWall(entity.id, checked($event))" />
+                             (change)="setWallOnSelection(checked($event))" />
                       <span>Pared (bloquea el paso)</span>
                     </label>
                     @if (entity.collider; as collider) {
@@ -577,6 +819,7 @@
         </div>
       </div>
     </section>
+    }
   </div>
 
   <!-- ===================== AREA INFERIOR =====================
@@ -600,14 +843,22 @@
           <span class="area__title">Eventos</span>
           <span class="head__sep"></span>
           <button class="tool" (click)="addEvent()">+ Evento</button>
+          <div class="head__spacer"></div>
+          <span class="head__label">{{ events().length }} eventos</span>
+        } @else if (workspace() === 'archivo') {
+          <span class="area__kind" title="Visor de archivos">◈</span>
+          <span class="area__title">{{ openFile()?.path ?? 'Archivo' }}</span>
+          <div class="head__spacer"></div>
+          @if (openFile(); as file) {
+            <span class="head__label">{{ fileSize(file.data.size) }}</span>
+            <button class="tool" (click)="closeOpenFile()" title="Cerrar el archivo">×</button>
+          }
         } @else {
           <span class="area__kind" title="Consola">›_</span>
           <span class="area__title">Salida</span>
+          <div class="head__spacer"></div>
+          <span class="head__label">{{ log().length }} lineas</span>
         }
-        <div class="head__spacer"></div>
-        <span class="head__label">
-          {{ workspace() === 'eventos' ? events().length + ' eventos' : log().length + ' lineas' }}
-        </span>
       </div>
 
       <div class="area__body pad">
@@ -690,6 +941,43 @@
               {{ conditions().length }} condiciones y {{ actions().length }} acciones.
             </p>
           }
+        } @else if (workspace() === 'archivo') {
+          <!-- Visor de solo lectura. El proceso principal decide por extension
+               si el archivo llega como texto, como imagen o si no se puede
+               mostrar; aca solo se elige con que caja dibujarlo. -->
+          @if (openFile(); as file) {
+            @switch (file.data.kind) {
+              @case ('text') {
+                @if (file.data.truncated) {
+                  <p class="hint hint--warn">
+                    Archivo grande: se muestran solo los primeros 400 KB.
+                  </p>
+                }
+                <pre class="fileview">{{ file.data.text }}</pre>
+              }
+              @case ('image') {
+                <div class="fileview fileview--image">
+                  <img [src]="file.data.dataUrl" [alt]="file.path" />
+                </div>
+              }
+              @default {
+                <p class="empty">
+                  @if (isTooLargeToPreview(file)) {
+                    {{ file.path }} pesa {{ fileSize(file.data.size) }}: es una imagen, pero demasiado
+                    pesada para previsualizarla aca.
+                  } @else {
+                    {{ file.path }} pesa {{ fileSize(file.data.size) }} y no es texto ni imagen:
+                    el editor no puede mostrarlo.
+                  }
+                </p>
+              }
+            }
+          } @else {
+            <p class="empty">
+              Ningun archivo abierto. Elegi uno en el explorador (pestana “Proyecto” de la barra
+              lateral) para verlo aca.
+            </p>
+          }
         } @else {
           <div class="console">
             @for (line of log(); track $index) {
@@ -711,9 +999,12 @@
   <footer class="statusbar">
     <span class="keyhint"><b>Rueda</b> Zoom</span>
     <span class="keyhint"><b>Derecho / Medio</b> Desplazar</span>
-    <span class="keyhint"><b>Inicio</b> Encuadrar</span>
+    <span class="keyhint"><b>Shift+clic</b> Sumar</span>
+    <span class="keyhint"><b>Ctrl+arrastrar</b> Mover</span>
+    <span class="keyhint"><b>Clic derecho</b> Tamaño</span>
     <span class="keyhint"><b>Shift+D</b> Duplicar</span>
     <span class="keyhint"><b>X</b> Eliminar</span>
+    <span class="keyhint"><b>Ctrl+B</b> Barra lateral</span>
 
     <div class="statusbar__spacer"></div>
 
