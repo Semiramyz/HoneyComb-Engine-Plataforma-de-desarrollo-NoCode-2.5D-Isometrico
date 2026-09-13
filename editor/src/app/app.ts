@@ -3,10 +3,16 @@
 // =============================================================================
 //
 // Todo el editor vive en un solo componente. Es una decision deliberada para el
-// prototipo: la ventana es una unica pantalla con docks fijos (arbol, recursos,
-// viewport, inspector, eventos) que comparten el mismo nivel abierto, y
-// partirla en componentes solo agregaria capas de @Input/@Output para pasar el
-// mismo estado de un lado a otro.
+// prototipo: la ventana es una unica pantalla con areas fijas (outliner,
+// recursos, viewport, propiedades, eventos) que comparten el mismo nivel
+// abierto, y partirla en componentes solo agregaria capas de @Input/@Output
+// para pasar el mismo estado de un lado a otro.
+//
+// La interfaz esta modelada sobre la de Blender: areas con cabecera propia
+// separadas por un surco, pestanas de workspace que cambian que editores estan
+// abiertos, propiedades en paneles plegables, y navegacion del viewport con
+// rueda (zoom al cursor), boton medio (desplazar) e Inicio (encuadrar). El tema
+// visual vive entero en app.scss.
 //
 // El estado NO vive aca: vive en los servicios (LevelService el nivel abierto,
 // ProjectService el disco, CatalogService el catalogo de eventos). Este archivo
@@ -43,10 +49,40 @@ type CatalogKind = 'triggers' | 'conditions' | 'actions';
 /** Plantillas del dialogo "nivel nuevo": vacio, con jugador, o escena de prueba. */
 export type NewLevelTemplate = 'empty' | 'player' | 'test-scene';
 
-// Zoom entero unicamente. En pixel art un zoom fraccionario (1.5x) reparte mal
-// los pixeles del sprite -- unos quedan de 1px y otros de 2px -- y arruina la
-// lectura de la imagen. Godot y Aseprite hacen lo mismo.
+/**
+ * Espacio de trabajo activo, al estilo de las workspaces de Blender: la pestana
+ * de arriba no cambia de pantalla, cambia QUE editores estan abiertos. En
+ * "layout" el viewport se queda con todo el alto; las otras dos abren el editor
+ * de abajo con eventos o con la consola.
+ */
+type Workspace = 'layout' | 'eventos' | 'salida';
+
+/**
+ * Pestana del editor de propiedades (la columna de iconos a su izquierda, como
+ * en Blender). "objeto" muestra la entidad seleccionada; "escena", el nivel y
+ * su grilla. Antes las propiedades del nivel solo se veian deseleccionando
+ * todo, que es justo lo que esta separacion evita.
+ */
+type InspectorTab = 'objeto' | 'escena';
+
+// Presets de zoom de la barra: enteros, porque en pixel art un zoom fraccionario
+// reparte mal los pixeles del sprite (unos de 1px y otros de 2px) y arruina la
+// lectura de la imagen.
 const ZOOM_STEPS = [1, 2, 3, 4, 6, 8];
+
+// La rueda, en cambio, hace zoom continuo como el de Blender: encuadrar es una
+// accion de navegacion, no de encuadre final, y saltar de 3x a 4x de golpe hace
+// perder el punto que se estaba mirando. Los presets de arriba siguen ahi para
+// volver a un entero exacto cuando importa ver los pixeles.
+const ZOOM_MIN = 0.25;
+const ZOOM_MAX = 16;
+/** Factor por muesca de rueda. ~1.15 da la misma sensacion de "arrastre" que Blender. */
+const ZOOM_WHEEL_FACTOR = 1.15;
+
+/** Margen superior del encuadre por defecto, en pixeles de canvas. */
+const VIEW_TOP_MARGIN = 60;
+/** Proporcion del viewport que ocupa la grilla al encuadrarla con Inicio. */
+const FRAME_FILL = 0.82;
 
 // Umbral de la matriz de riesgos ("Degradacion de Rendimiento por Usuario"):
 // el editor avisa antes de que la escena comprometa los FPS del runtime.
@@ -64,6 +100,10 @@ interface ParamRow {
   selector: 'app-root',
   templateUrl: './app.html',
   styleUrl: './app.scss',
+  // Los atajos se escuchan en window y no en el canvas: en Blender funcionan
+  // con el puntero sobre cualquier editor, no solo sobre el viewport, y ademas
+  // el canvas no tiene foco propio (habria que darle tabindex y pedirlo a mano).
+  host: { '(window:keydown)': 'onKeyDown($event)' },
 })
 export class App {
   readonly project = inject(ProjectService);
@@ -101,16 +141,32 @@ export class App {
   readonly pan = signal({ x: 0, y: 0 });
   /** Celda bajo el cursor, para resaltarla. Null cuando el mouse sale del canvas. */
   readonly hovered = signal<GridCoord | null>(null);
-  readonly bottomPanel = signal<'eventos' | 'salida'>('eventos');
+  readonly workspace = signal<Workspace>('layout');
+  readonly inspectorTab = signal<InspectorTab>('objeto');
   readonly log = signal<string[]>([]);
 
+  /**
+   * Paneles del inspector plegados, por id. Se guarda el conjunto de PLEGADOS y
+   * no el de abiertos para que un panel nuevo aparezca desplegado sin tener que
+   * inicializarlo en ningun lado.
+   */
+  private readonly collapsedPanels = signal<Record<string, boolean>>({});
+
   readonly zoomSteps = ZOOM_STEPS;
+  /** Zoom en porcentaje para la barra de estado, como el de Blender. */
+  readonly zoomLabel = computed(() => Math.round(this.zoom() * 100) + '%');
 
   private readonly viewport = viewChild<ElementRef<HTMLCanvasElement>>('viewport');
   /** Tamano real del canvas en pixeles. Lo mantiene al dia el ResizeObserver. */
   private readonly canvasSize = signal({ w: 0, h: 0 });
   private observer?: ResizeObserver;
-  private dragging = false;
+  /**
+   * Hay un arrastre de camara en curso. Es un signal y no un campo suelto
+   * porque la plantilla lo lee para cambiar el cursor a "mano cerrada"; se
+   * escribe dos veces por gesto (al apretar y al soltar), no en cada
+   * movimiento, asi que no cuesta nada.
+   */
+  readonly panning = signal(false);
   /** Punto donde empezo el arrastre + pan que habia entonces, para calcular el delta. */
   private dragOrigin = { x: 0, y: 0, panX: 0, panY: 0 };
 
@@ -203,9 +259,9 @@ export class App {
     try {
       await this.levels.load(fileName);
       this.dirty.set(false);
-      // Sin resetear el pan, un nivel chico abierto despues de uno grande
-      // podria quedar fuera de la vista.
-      this.pan.set({ x: 0, y: 0 });
+      // Sin recentrar, un nivel chico abierto despues de uno grande podria
+      // quedar fuera de la vista o entrar con un zoom que no le corresponde.
+      this.frameAll();
       this.note('Nivel "' + fileName + '" cargado (' + this.entities().length + ' entidades).');
     } catch (error) {
       this.note('Error al cargar ' + fileName + ': ' + this.describe(error));
@@ -253,7 +309,7 @@ export class App {
     this.addStarterEntities(this.newLevelTemplate(), grid);
     this.showNewLevelDialog.set(false);
     this.dirty.set(true);
-    this.pan.set({ x: 0, y: 0 });
+    this.frameAll();
     this.note('Nivel nuevo en memoria. Revisa la escena y guardalo.');
   }
 
@@ -317,15 +373,149 @@ export class App {
     }
   }
 
+  // --- Interfaz: workspaces y paneles plegables -----------------------------
+
+  /** Un panel del inspector esta plegado solo si figura en el mapa como true. */
+  isCollapsed(id: string): boolean {
+    return this.collapsedPanels()[id] === true;
+  }
+
+  togglePanel(id: string): void {
+    this.collapsedPanels.update((state) => ({ ...state, [id]: !state[id] }));
+  }
+
   // --- Viewport -------------------------------------------------------------
 
   setZoom(step: number): void {
-    this.zoom.set(step);
+    this.zoom.set(this.clampZoom(step));
   }
 
-  resetView(): void {
-    this.pan.set({ x: 0, y: 0 });
-    this.zoom.set(3);
+  private clampZoom(value: number): number {
+    return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value));
+  }
+
+  /**
+   * Zoom con la rueda, anclado al cursor: el punto de la escena que esta bajo
+   * el mouse se queda EXACTAMENTE donde esta, y todo lo demas se acerca o se
+   * aleja alrededor de el. Es lo que hace Blender con "Zoom to Mouse Position"
+   * y es la diferencia entre encuadrar de una o pelearse con el paneo despues
+   * de cada muesca.
+   *
+   * La cuenta: si un punto del mundo esta en worldX = (mouseX - originX) / zoom,
+   * para que no se mueva al pasar de "old" a "next" el origen tiene que
+   * correrse worldX * (old - next). Como origin() es pan mas una constante,
+   * ese mismo delta se le aplica al pan.
+   */
+  onWheel(event: WheelEvent): void {
+    // Sin esto Electron desplaza el contenedor y el zoom se pierde.
+    event.preventDefault();
+
+    const ref = this.viewport();
+    if (!ref) {
+      return;
+    }
+
+    const old = this.zoom();
+    const next = this.clampZoom(
+      event.deltaY < 0 ? old * ZOOM_WHEEL_FACTOR : old / ZOOM_WHEEL_FACTOR,
+    );
+    // Ya estamos en un extremo del rango: no hay nada que recalcular.
+    if (next === old) {
+      return;
+    }
+
+    const rect = ref.nativeElement.getBoundingClientRect();
+    const origin = this.origin();
+    const worldX = (event.clientX - rect.left - origin.x) / old;
+    const worldY = (event.clientY - rect.top - origin.y) / old;
+
+    const pan = this.pan();
+    this.pan.set({
+      x: pan.x + worldX * (old - next),
+      y: pan.y + worldY * (old - next),
+    });
+    this.zoom.set(next);
+  }
+
+  /**
+   * Encuadra la grilla entera en el viewport, como el Inicio de Blender. Se
+   * calcula el rectangulo que ocupa la grilla ya proyectada (incluyendo el alto
+   * del rombo de la ultima fila) y se elige el zoom que lo hace entrar con
+   * margen, dejandolo centrado.
+   */
+  frameAll(): void {
+    const size = this.canvasSize();
+    const grid = this.grid();
+    if (size.w === 0 || size.h === 0) {
+      return;
+    }
+
+    const halfW = grid.tileWidth / 2;
+    const halfH = grid.tileHeight / 2;
+    // Extremos de la proyeccion isometrica: la columna crece hacia la derecha y
+    // la fila hacia la izquierda, asi que el ancho lo dan las dos esquinas
+    // laterales y el alto va de la punta de (0,0) a la base de la ultima celda.
+    const minX = -grid.height * halfW;
+    const maxX = grid.width * halfW;
+    const minY = 0;
+    const maxY = (grid.width - 1 + grid.height - 1) * halfH + grid.tileHeight;
+
+    const zoom = this.clampZoom(
+      Math.min((size.w * FRAME_FILL) / (maxX - minX), (size.h * FRAME_FILL) / (maxY - minY)),
+    );
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    // origin() = (w/2 + panX, VIEW_TOP_MARGIN + panY); se despeja el pan que
+    // deja el centro de la grilla en el centro del canvas.
+    this.zoom.set(zoom);
+    this.pan.set({
+      x: -centerX * zoom,
+      y: size.h / 2 - VIEW_TOP_MARGIN - centerY * zoom,
+    });
+  }
+
+  /**
+   * Atajos de teclado, con el mismo reparto que Blender:
+   *   Inicio    encuadrar todo         Supr / X   borrar el objeto activo
+   *   Shift+D   duplicar               Ctrl+S     guardar
+   *
+   * El primer if es la parte importante: si el foco esta en un campo de texto
+   * el atajo no corre. Sin eso, escribir una "x" en el id de una entidad la
+   * borraria.
+   */
+  onKeyDown(event: KeyboardEvent): void {
+    const target = event.target as HTMLElement | null;
+    const tag = target?.tagName;
+    if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || target?.isContentEditable) {
+      return;
+    }
+    // Un dialogo abierto se lleva todos los atajos: solo responde a Escape.
+    if (this.showNewLevelDialog()) {
+      if (event.key === 'Escape') {
+        this.cancelNewLevel();
+      }
+      return;
+    }
+
+    if (event.ctrlKey && event.key.toLowerCase() === 's') {
+      event.preventDefault();
+      void this.save();
+      return;
+    }
+    if (event.key === 'Home') {
+      event.preventDefault();
+      this.frameAll();
+      return;
+    }
+    if (event.key === 'Delete' || event.key.toLowerCase() === 'x') {
+      this.deleteSelected();
+      return;
+    }
+    if (event.shiftKey && event.key.toLowerCase() === 'd') {
+      event.preventDefault();
+      this.duplicateSelected();
+    }
   }
 
   toggleGrid(): void {
@@ -337,9 +527,11 @@ export class App {
   }
 
   onPointerDown(event: PointerEvent): void {
-    // Boton medio o shift-arrastre: paneo, como en Godot.
-    if (event.button === 1 || event.shiftKey) {
-      this.dragging = true;
+    // Tres formas de desplazar la vista: boton medio (el de Blender), boton
+    // derecho (la mas comoda con mouse de dos botones o trackpad) y
+    // shift-arrastre (para cuando el derecho ya esta ocupado).
+    if (event.button === 1 || event.button === 2 || event.shiftKey) {
+      this.panning.set(true);
       const pan = this.pan();
       this.dragOrigin = { x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y };
       // Con captura, el arrastre sigue funcionando aunque el cursor se vaya
@@ -349,7 +541,7 @@ export class App {
       return;
     }
 
-    // Solo el boton izquierdo edita; el derecho queda libre para el menu.
+    // Solo el boton izquierdo edita.
     if (event.button !== 0) {
       return;
     }
@@ -366,12 +558,12 @@ export class App {
       this.levels.toggleTile(cell.col, cell.row, activeTool);
       this.dirty.set(true);
     } else {
-      this.levels.selectEntity(this.entityAt(event));
+      this.selectEntity(this.entityAt(event));
     }
   }
 
   onPointerMove(event: PointerEvent): void {
-    if (this.dragging) {
+    if (this.panning()) {
       this.pan.set({
         x: this.dragOrigin.panX + (event.clientX - this.dragOrigin.x),
         y: this.dragOrigin.panY + (event.clientY - this.dragOrigin.y),
@@ -382,10 +574,19 @@ export class App {
   }
 
   onPointerUp(event: PointerEvent): void {
-    if (this.dragging) {
-      this.dragging = false;
+    if (this.panning()) {
+      this.panning.set(false);
       (event.target as HTMLElement).releasePointerCapture(event.pointerId);
     }
+  }
+
+  /**
+   * El menu contextual del navegador se cancela SIEMPRE sobre el canvas: el
+   * boton derecho ahi es desplazar la vista, y si el menu apareciera al soltar
+   * cortaria el gesto justo al terminarlo.
+   */
+  onContextMenu(event: MouseEvent): void {
+    event.preventDefault();
   }
 
   onPointerLeave(): void {
@@ -426,12 +627,20 @@ export class App {
     };
     this.levels.addEntity(entity);
     // Queda seleccionada para poder ajustarla en el inspector sin buscarla.
-    this.levels.selectEntity(entity.id);
+    this.selectEntity(entity.id);
     this.dirty.set(true);
   }
 
+  /**
+   * Selecciona una entidad y trae al frente la pestana de propiedades del
+   * objeto: seleccionar algo y que el inspector siga mostrando la escena seria
+   * un click perdido.
+   */
   selectEntity(id: string | null): void {
     this.levels.selectEntity(id);
+    if (id) {
+      this.inspectorTab.set('objeto');
+    }
   }
 
   deleteSelected(): void {
@@ -462,7 +671,7 @@ export class App {
       collider: source.collider ? { ...source.collider } : undefined,
     };
     this.levels.addEntity(copy);
-    this.levels.selectEntity(copy.id);
+    this.selectEntity(copy.id);
     this.dirty.set(true);
   }
 
@@ -700,7 +909,7 @@ export class App {
     const size = this.canvasSize();
     const pan = this.pan();
     // Mismo encuadre que main.cpp: centro horizontal y un margen superior.
-    return { x: Math.round(size.w / 2 + pan.x), y: Math.round(60 + pan.y) };
+    return { x: size.w / 2 + pan.x, y: VIEW_TOP_MARGIN + pan.y };
   }
 
   /** Celda de la grilla bajo el cursor. Puede quedar fuera de rango: quien llama valida. */
@@ -765,12 +974,19 @@ export class App {
    * vez que cambia algo que se ve; no hay bucle de animacion.
    *
    * Orden de dibujado (de atras hacia adelante):
-   *   fondo -> grilla -> celda bajo el cursor -> entidades por profundidad
+   *   fondo -> grilla -> ejes -> tiles -> celda bajo el cursor
+   *         -> entidades por profundidad -> gizmo y textos de overlay
+   *
+   * El aspecto sigue al viewport 3D de Blender a proposito: gris neutro sin
+   * tinte, lineas de grilla apenas mas claras que el fondo, y los dos ejes del
+   * mundo en rojo y verde. Ese codigo de color es el mismo que usa Blender
+   * (X rojo, Y verde) y aca sirve igual: dice de un vistazo hacia donde crecen
+   * la columna y la fila, que en isometrico no es obvio.
    *
    * Las entidades se dibujan como rectangulos de color y no con su textura
    * real: el editor no carga las imagenes del proyecto todavia. El color por
-   * tipo alcanza para componer la escena, y el ancla naranja marca donde va a
-   * apoyarse de verdad en el runtime.
+   * tipo alcanza para componer la escena, y el ancla marca donde va a apoyarse
+   * de verdad en el runtime.
    */
   private draw(): void {
     const ref = this.viewport();
@@ -800,20 +1016,25 @@ export class App {
     const selectedId = this.levels.selectedEntityId();
     const hovered = this.hovered();
 
-    ctx.fillStyle = '#14171d';
+    // Fondo del viewport: el gris de Blender en modo solido, sin nada de azul.
+    ctx.fillStyle = '#393939';
     ctx.fillRect(0, 0, size.w, size.h);
 
     const halfW = (grid.tileWidth / 2) * zoom;
     const halfH = (grid.tileHeight / 2) * zoom;
     const fullH = grid.tileHeight * zoom;
 
+    /** Pasa una celda a pixeles del canvas (esquina superior del rombo). */
+    const project = (coord: GridCoord) => {
+      const point = iso.gridToScreen(coord);
+      return { x: origin.x + point.x * zoom, y: origin.y + point.y * zoom };
+    };
+
     // Traza el rombo de una celda (sin pintarlo): quien llama decide si lo
     // rellena, lo bordea o las dos cosas. Los cuatro puntos van desde la punta
     // superior, en sentido horario.
     const diamond = (coord: GridCoord) => {
-      const point = iso.gridToScreen(coord);
-      const x = origin.x + point.x * zoom;
-      const y = origin.y + point.y * zoom;
+      const { x, y } = project(coord);
       ctx.beginPath();
       ctx.moveTo(x, y);
       ctx.lineTo(x + halfW, y + halfH);
@@ -823,18 +1044,67 @@ export class App {
     };
 
     if (this.showGrid()) {
-      ctx.lineWidth = 1;
-      for (let row = 0; row < grid.height; row += 1) {
-        for (let col = 0; col < grid.width; col += 1) {
-          diamond({ col, row });
-          // Damero: dos grises casi iguales. Con un color plano no se
-          // distinguirian las celdas; con mas contraste, competiria con el arte.
-          ctx.fillStyle = (col + row) % 2 === 0 ? '#1c2029' : '#191d25';
-          ctx.fill();
-          ctx.strokeStyle = '#262c37';
-          ctx.stroke();
+      // El suelo de la grilla es una sola forma plana, no un damero: Blender no
+      // alterna el color de sus cuadros, y el damero competia con el arte.
+      ctx.beginPath();
+      const corners: GridCoord[] = [
+        { col: 0, row: 0 },
+        { col: grid.width, row: 0 },
+        { col: grid.width, row: grid.height },
+        { col: 0, row: grid.height },
+      ];
+      corners.forEach((corner, index) => {
+        const { x, y } = project(corner);
+        if (index === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
         }
+      });
+      ctx.closePath();
+      ctx.fillStyle = '#333333';
+      ctx.fill();
+
+      // Lineas de division: un pelo mas claras que el suelo, como las de
+      // Blender. Se dibujan como dos familias de rectas completas y no rombo a
+      // rombo -- una linea por borde en vez de una por celda, sin trazos
+      // repetidos que se ven mas gruesos al superponerse.
+      ctx.strokeStyle = '#4a4a4a';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let col = 0; col <= grid.width; col += 1) {
+        const from = project({ col, row: 0 });
+        const to = project({ col, row: grid.height });
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(to.x, to.y);
       }
+      for (let row = 0; row <= grid.height; row += 1) {
+        const from = project({ col: 0, row });
+        const to = project({ col: grid.width, row });
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(to.x, to.y);
+      }
+      ctx.stroke();
+
+      // Los dos ejes que salen de la celda (0,0), con el color de Blender:
+      // rojo el que hace crecer la columna, verde el que hace crecer la fila.
+      // Van despues de la grilla para quedar por encima de ella.
+      const zero = project({ col: 0, row: 0 });
+      ctx.lineWidth = 1.5;
+
+      ctx.strokeStyle = 'rgba(197, 79, 79, 0.85)';
+      ctx.beginPath();
+      ctx.moveTo(zero.x, zero.y);
+      const colEnd = project({ col: grid.width, row: 0 });
+      ctx.lineTo(colEnd.x, colEnd.y);
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(112, 158, 60, 0.85)';
+      ctx.beginPath();
+      ctx.moveTo(zero.x, zero.y);
+      const rowEnd = project({ col: 0, row: grid.height });
+      ctx.lineTo(rowEnd.x, rowEnd.y);
+      ctx.stroke();
     }
 
     // Las celdas fuera de la forma del mapa quedan oscuras; las paredes se
@@ -843,14 +1113,12 @@ export class App {
       for (const tile of level.tiles) {
         if (tile.floor === false) {
           diamond(tile);
-          ctx.fillStyle = '#0d1015';
+          ctx.fillStyle = '#2a2a2a';
           ctx.fill();
         }
         if (tile.wall) {
-          const point = iso.gridToScreen(tile);
-          const x = origin.x + point.x * zoom;
-          const y = origin.y + point.y * zoom;
-          ctx.fillStyle = 'rgba(224, 90, 90, 0.32)';
+          const { x, y } = project(tile);
+          ctx.fillStyle = 'rgba(216, 122, 74, 0.35)';
           ctx.fillRect(x - 3 * zoom, y - 10 * zoom, 6 * zoom, 10 * zoom);
         }
       }
@@ -860,10 +1128,10 @@ export class App {
     // resalta nada, que es la pista visual de que ahi no se puede colocar.
     if (hovered && iso.isValidCoord(hovered, grid.width, grid.height)) {
       diamond(hovered);
-      ctx.fillStyle = 'rgba(245, 166, 35, 0.15)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.07)';
       ctx.fill();
-      ctx.strokeStyle = '#f5a623';
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.lineWidth = 1;
       ctx.stroke();
     }
 
@@ -873,11 +1141,10 @@ export class App {
     );
 
     for (const entity of ordered) {
-      const point = iso.gridToScreen(entity.position);
-      const x = origin.x + point.x * zoom;
-      const y = origin.y + point.y * zoom;
+      const { x, y } = project(entity.position);
       const w = entity.sourceRect.width * zoom;
       const h = entity.sourceRect.height * zoom;
+      const isSelected = entity.id === selectedId;
 
       ctx.fillStyle = this.entityColor(entity.type);
       ctx.fillRect(x, y, w, h);
@@ -888,29 +1155,109 @@ export class App {
       // Collider en verde punteado: se ve que es una caja logica y no arte.
       if (this.showColliders() && entity.collider) {
         ctx.setLineDash([3, 3]);
-        ctx.strokeStyle = '#5be0a0';
+        ctx.strokeStyle = '#6b9e3f';
         ctx.strokeRect(x, y, entity.collider.width * zoom, entity.collider.height * zoom);
         ctx.setLineDash([]);
       }
 
-      if (entity.id === selectedId) {
-        ctx.strokeStyle = '#f5a623';
-        ctx.lineWidth = 2;
+      // Contorno naranja del objeto activo, igual que el de Blender: un halo
+      // oscuro por fuera para que se lea sobre cualquier color de relleno, y el
+      // naranja pegado al sprite.
+      if (isSelected) {
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.strokeRect(x - 2, y - 2, w + 4, h + 4);
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = '#ff8b1f';
         ctx.strokeRect(x - 2, y - 2, w + 4, h + 4);
       }
 
       // Ancla real del runtime: la punta superior del rombo (origin {0,0}).
-      ctx.fillStyle = '#f5a623';
-      ctx.fillRect(x - 1, y - 1, 3, 3);
+      ctx.fillStyle = isSelected ? '#ff8b1f' : 'rgba(255, 255, 255, 0.55)';
+      ctx.fillRect(x - 1.5, y - 1.5, 3, 3);
 
-      // El id solo desde 3x: mas chico, las etiquetas se pisan entre si y
+      // El id solo desde 2x: mas chico, las etiquetas se pisan entre si y
       // ensucian mas de lo que ayudan.
-      if (zoom >= 3) {
-        ctx.font = '10px ui-monospace, monospace';
-        ctx.fillStyle = '#aeb6c2';
+      if (zoom >= 2) {
+        ctx.font = '10px Inter, "Segoe UI", sans-serif';
+        ctx.fillStyle = isSelected ? '#ffd0a0' : 'rgba(230, 230, 230, 0.6)';
         ctx.fillText(entity.id, x, y - 6);
       }
     }
+
+    this.drawAxisGizmo(ctx, size, iso, grid);
+  }
+
+  /**
+   * Gizmo de navegacion de la esquina superior derecha, el mismo que Blender
+   * pone en su viewport 3D: dos brazos con una bolita en la punta, en la
+   * direccion REAL de cada eje segun la proyeccion isometrica del nivel.
+   *
+   * No es decoracion: como la proyeccion depende de tileWidth/tileHeight, la
+   * inclinacion de los ejes cambia con la grilla, y el gizmo lo muestra.
+   */
+  private drawAxisGizmo(
+    ctx: CanvasRenderingContext2D,
+    size: { w: number; h: number },
+    iso: IsoProjection,
+    grid: GridConfig,
+  ): void {
+    const radius = 30;
+    const cx = size.w - radius - 18;
+    const cy = radius + 18;
+
+    // Direccion unitaria de cada eje en pantalla: se proyecta un paso de una
+    // celda y se normaliza, asi el gizmo tiene siempre el mismo tamano aunque
+    // el tile mida 64x32 o 32x32.
+    const unit = (coord: GridCoord) => {
+      const point = iso.gridToScreen(coord);
+      const length = Math.hypot(point.x, point.y) || 1;
+      return { x: point.x / length, y: point.y / length };
+    };
+    const colDir = unit({ col: 1, row: 0 });
+    const rowDir = unit({ col: 0, row: 1 });
+
+    const arm = (dir: { x: number; y: number }, color: string, label: string) => {
+      const tipX = cx + dir.x * radius;
+      const tipY = cy + dir.y * radius;
+
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(tipX, tipY);
+      ctx.stroke();
+
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(tipX, tipY, 8, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = '#101010';
+      ctx.font = '600 9px Inter, "Segoe UI", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, tipX, tipY + 0.5);
+      // Se restauran los defaults: el resto de draw() dibuja texto alineado a
+      // la izquierda y da por hecho ese estado.
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+    };
+
+    arm(colDir, '#c54f4f', 'C');
+    arm(rowDir, '#709e3c', 'F');
+
+    // Medidas del nivel bajo el gizmo, como el texto de estadisticas del
+    // viewport de Blender.
+    ctx.font = '10px Inter, "Segoe UI", sans-serif';
+    ctx.fillStyle = 'rgba(230, 230, 230, 0.45)';
+    ctx.textAlign = 'right';
+    ctx.fillText(
+      grid.width + ' x ' + grid.height + '  ·  ' + grid.tileWidth + 'x' + grid.tileHeight + ' px',
+      size.w - 18,
+      cy + radius + 22,
+    );
+    ctx.textAlign = 'left';
   }
 
   /**
@@ -920,13 +1267,13 @@ export class App {
   private entityColor(type: string): string {
     switch (type) {
       case 'player':
-        return '#f5a623';
+        return '#e08a3c';
       case 'obstacle':
-        return '#e05a5a';
+        return '#c05050';
       case 'item':
-        return '#4fb286';
+        return '#5f9e4a';
       default:
-        return '#5b8fd6';
+        return '#4772b3';
     }
   }
 

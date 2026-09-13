@@ -1,9 +1,21 @@
 /* Estilos del editor (componente App). La base global -- fondo y tipografia de
    la pagina -- esta en src/styles.scss; todo lo demas es esto.
 
-   Tema oscuro tipo Godot/GameMaker: docks acoplados, cromo minimo, acento ambar
-   por la identidad HoneyComb. Todo el color vive en las variables de :host, asi
-   que cambiar la paleta entera se hace ahi y en ningun otro lado.
+   Tema calcado del oscuro de Blender. Las tres decisiones que lo definen, y de
+   las que sale casi todo lo demas:
+
+     1. GRIS NEUTRO, sin tinte. Blender no mete ni una gota de azul en sus
+        grises; un #1e222a (azulado) es lo que hace que una interfaz oscura se
+        vea "de plantilla web" en vez de "de herramienta 3D".
+
+     2. AREAS CUADRADAS, WIDGETS REDONDEADOS. Los editores se pegan entre si
+        separados por un surco oscuro de 2px y no tienen esquinas redondeadas;
+        los controles de adentro si, con 4px. Ese contraste es la firma visual
+        de Blender.
+
+     3. UN SOLO AZUL DE ACENTO (#4772b3) para "esto esta activo/seleccionado", y
+        el naranja solo para el objeto activo en el viewport. Blender no reparte
+        color por decoracion: cada uno significa una cosa.
 
    Dos convenciones que se repiten en todo el archivo:
 
@@ -15,35 +27,48 @@
        pestana abierta, entidad seleccionada). La clase la pone la plantilla con
        [class.is-active], nunca el CSS. */
 :host {
-  /* Fondos, del mas oscuro al mas claro. La jerarquia es intencional: el fondo
-     profundo es el lienzo, los paneles se apoyan encima y las cabeceras quedan
-     un escalon mas arriba, para que la profundidad se lea sin usar sombras. */
-  --bg-deep: #14171d;    /* lienzo del viewport y fondo de la ventana */
-  --bg-panel: #1e222a;   /* cuerpo de los docks */
-  --bg-panel-alt: #232833; /* filas y tarjetas dentro de un dock */
-  --bg-head: #272d38;    /* cabeceras, barras y pestanas */
-  --bg-input: #171b21;   /* campos de texto: mas oscuros que el panel, se hunden */
+  /* Fondos, del mas oscuro al mas claro. Son los valores del tema Dark de
+     Blender: la ventana y el surco entre areas son lo mas oscuro, el cuerpo de
+     cada editor queda un escalon arriba, y los paneles otro mas. La profundidad
+     se lee por el escalon de gris, sin una sola sombra. */
+  --bg-window: #1d1d1d;     /* topbar, barra de estado y surco entre areas */
+  --bg-header: #2b2b2b;     /* cabecera de cada editor */
+  --bg-editor: #303030;     /* cuerpo de un editor (outliner, propiedades) */
+  --bg-panel: #383838;      /* panel desplegable dentro de propiedades */
+  --bg-panel-head: #424242; /* cabecera de ese panel */
+  --bg-viewport: #393939;   /* lienzo isometrico (lo repinta el canvas) */
 
-  --border: #101319;      /* separacion fuerte entre zonas (casi negro) */
-  --border-soft: #333a46; /* separacion suave dentro de una zona */
+  /* Widgets. En Blender un boton es un gris claro sobre fondo oscuro -- al
+     reves de lo habitual en la web -- y los campos de texto son los unicos que
+     se hunden hasta el negro. */
+  --widget: #545454;
+  --widget-hover: #656565;
+  --widget-sunken: #1d1d1d;
+
+  --border: #101010;      /* surco entre areas (casi negro) */
+  --border-soft: #3d3d3d; /* separacion suave dentro de un editor */
 
   /* Tres niveles de texto: el normal, el atenuado para etiquetas y datos
      secundarios, y el brillante para lo que tiene el foco. */
-  --text: #c7cdd8;
-  --text-dim: #79818f;
-  --text-bright: #eef1f6;
+  --text: #e5e5e5;
+  --text-dim: #989898;
+  --text-bright: #ffffff;
 
-  --accent: #f5a623;     /* ambar HoneyComb: seleccion, foco y estado activo */
-  --accent-dim: #7a5312; /* el mismo ambar de fondo, para rellenos sin encandilar */
-  --danger: #e05a5a;     /* borrar y obstaculos */
-  --ok: #5be0a0;         /* colliders e items */
+  --accent: #4772b3;      /* azul de seleccion de Blender: pestana y fila activa */
+  --accent-hi: #5c8ad0;
+  --active: #ff8b1f;      /* naranja del objeto activo: solo eso */
+  --danger: #a33c3c;
+  --ok: #6b9e3f;
+
+  --radius: 4px;          /* redondez de widget de Blender (roundness 0.4) */
 
   display: block;
   height: 100vh;
   overflow: hidden;
   color: var(--text);
-  font: 12px/1.45 "Segoe UI", Inter, system-ui, sans-serif;
-  background: var(--bg-deep);
+  /* Inter es la tipografia que Blender usa desde la 4.0. */
+  font: 12px/1.4 Inter, "Segoe UI", system-ui, sans-serif;
+  background: var(--bg-window);
 }
 
 /* border-box en todo: los anchos fijos de los docks incluyen su borde y su
@@ -52,73 +77,107 @@
   box-sizing: border-box;
 }
 
-/* Esqueleto de la ventana: cuatro bandas horizontales, de arriba abajo.
+/* Esqueleto de la ventana, de arriba abajo:
 
-     38px  barra superior (proyecto, nivel, guardar)
+     26px  topbar (menus + pestanas de workspace)
      1fr   cuerpo -- se queda con todo el alto sobrante
-     220px dock inferior (eventos / salida)
-     24px  barra de estado
+     auto  editor inferior (eventos / salida), solo en esas workspaces
+     22px  barra de estado
 
-   Solo la fila del cuerpo es elastica; las otras tres tienen alto fijo para que
-   la interfaz no se mueva sola al cambiar el contenido. */
+   El "gap" de 2px con el fondo de la ventana detras es el surco que Blender
+   deja entre areas: no es un borde de cada panel, es el fondo que se ve. */
 .shell {
   display: grid;
-  grid-template-rows: 38px 1fr 220px 24px;
+  grid-template-rows: 26px 1fr auto 22px;
+  gap: 2px;
   height: 100%;
+  background: var(--bg-window);
 }
 
-/* ---------- Barra superior ---------- */
-.menubar {
+/* ---------- Topbar ---------- */
+.topbar {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 0 10px;
-  background: var(--bg-head);
-  border-bottom: 1px solid var(--border);
+  gap: 2px;
+  padding: 0 6px;
+  background: var(--bg-window);
 }
 
 .brand {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 5px;
-  padding-right: 10px;
-  border-right: 1px solid var(--border-soft);
+  padding: 0 10px 0 2px;
 
   &__mark {
-    color: var(--accent);
-    font-size: 15px;
+    color: var(--active);
+    font-size: 13px;
   }
   &__name {
-    color: var(--text-bright);
-    font-weight: 600;
-    letter-spacing: 0.2px;
-  }
-  &__sub {
-    color: var(--text-dim);
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
+    color: var(--text);
+    font-weight: 500;
   }
 }
 
-.menubar__group {
+/* Los "menus" del topbar (Archivo, Editar, Vista). Planos hasta que se los
+   pasa por encima, como los de Blender. */
+.menu {
+  height: 20px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--widget);
+  }
+}
+
+/* Pestanas de workspace. Van pegadas al borde inferior del topbar y la activa
+   se funde con el fondo del cuerpo: es asi como Blender indica cual esta
+   abierta, sin subrayados ni bordes de color. */
+.wstabs {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  align-items: flex-end;
+  gap: 1px;
+  height: 100%;
+  margin-left: 10px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border-soft);
 }
 
-.menubar__spacer,
-.toolbar__spacer,
+.wstab {
+  height: 20px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--text);
+  }
+  &.is-active {
+    background: var(--bg-header);
+    color: var(--text-bright);
+  }
+}
+
+.topbar__spacer,
+.head__spacer,
 .statusbar__spacer,
-.tabs__spacer,
 .event__spacer {
   flex: 1;
 }
 
-/* ---------- Cuerpo ---------- */
-/* Tres columnas: dock izquierdo (escena + recursos), viewport y dock derecho
-   (inspector). Los laterales son fijos y el viewport se queda con el resto, que
-   es como se comportan los editores de juego.
+/* ---------- Cuerpo: tres areas ---------- */
+/* Outliner + viewport + propiedades. Los laterales son fijos y el viewport se
+   queda con el resto.
 
    El "min-height: 0" que aparece aca y en casi todos los contenedores de abajo
    NO es decorativo: por defecto un hijo de grid o flex no achica por debajo de
@@ -126,95 +185,75 @@
    ventana en vez de mostrar su propia barra de scroll. */
 .body {
   display: grid;
-  grid-template-columns: 232px 1fr 272px;
+  grid-template-columns: 230px 1fr 290px;
+  gap: 2px;
   min-height: 0;
 }
 
-.dock {
+/* Un "area" es un editor de Blender: cabecera propia arriba y cuerpo debajo.
+   Todas las zonas de la ventana usan esta misma caja. */
+.area {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: var(--bg-panel);
-
-  &--left {
-    border-right: 1px solid var(--border);
-  }
-  &--right {
-    border-left: 1px solid var(--border);
-  }
-  &--bottom {
-    border-top: 1px solid var(--border);
-    min-height: 0;
-  }
-}
-
-.panel {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  border-bottom: 1px solid var(--border);
-
-  &--grow {
-    flex: 1;
-  }
+  min-width: 0;
+  background: var(--bg-editor);
 
   &__head {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 6px 10px;
-    background: var(--bg-head);
-    color: var(--text-bright);
+    gap: 4px;
+    flex: 0 0 26px;
+    padding: 0 6px;
+    background: var(--bg-header);
+  }
+
+  /* Icono de tipo de editor: el boton cuadrado que en Blender abre el
+     desplegable para cambiar que editor ocupa el area. Aca es solo la
+     etiqueta, pero es lo primero que se lee de cada cabecera. */
+  &__kind {
+    display: grid;
+    place-items: center;
+    width: 22px;
+    height: 18px;
+    border-radius: 3px;
+    background: var(--widget);
+    color: var(--text);
     font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    border-bottom: 1px solid var(--border);
   }
 
-  &__count {
-    padding: 0 5px;
-    border-radius: 8px;
-    background: var(--bg-input);
+  &__title {
     color: var(--text-dim);
-    font-size: 10px;
-    font-weight: 500;
-    letter-spacing: 0;
+    font-size: 11px;
   }
 
-  /* El cuerpo del panel es lo unico que scrollea; la cabecera queda fija
-     arriba. Las tres variantes de abajo son las tres formas de contenido que
-     hay: lista (arbol de escena), mosaico (recursos) y formulario (inspector). */
   &__body {
-    overflow: auto;
+    flex: 1;
     min-height: 0;
-
-    &--list {
-      padding: 3px 0;
-    }
-    /* auto-fill con minimo de 66px: entran tantas miniaturas por fila como
-       permita el ancho del dock, sin fijar el numero de columnas a mano. El
-       alto se topea para que la paleta no se coma el arbol de escena. */
-    &--tiles {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(66px, 1fr));
-      gap: 5px;
-      padding: 8px;
-      max-height: 190px;
-    }
-    &--form {
-      padding: 8px;
-    }
+    overflow: auto;
   }
 }
 
-/* ---------- Arbol de escena ---------- */
+/* El outliner apila dos editores (escena y recursos) en la misma columna. */
+.stack {
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 2px;
+  min-height: 0;
+}
+
+/* ---------- Outliner (arbol de escena) ---------- */
+.tree {
+  padding: 2px 0;
+}
+
 .tree__item {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   width: 100%;
-  padding: 4px 10px;
+  height: 20px;
+  padding: 0 8px;
   border: 0;
   background: transparent;
   color: var(--text);
@@ -223,32 +262,37 @@
   cursor: pointer;
 
   &:hover {
-    background: var(--bg-panel-alt);
+    background: #3a3a3a;
   }
 
+  /* Fila seleccionada: el azul de Blender ocupa la fila entera. */
   &.is-active {
-    background: var(--accent-dim);
+    background: var(--accent);
     color: var(--text-bright);
   }
 
   &--root {
-    color: var(--text-bright);
-    font-weight: 600;
+    font-weight: 500;
+  }
+
+  /* Sangria de los hijos + la guia vertical que Blender dibuja bajo el padre. */
+  &--child {
+    padding-left: 22px;
   }
 }
 
 .tree__icon {
-  color: #5b8fd6;
-  font-size: 11px;
+  color: #7aa2d8;
+  font-size: 10px;
 
   &--player {
-    color: var(--accent);
+    color: var(--active);
   }
   &--obstacle {
-    color: var(--danger);
+    color: #d06a6a;
   }
   &--item {
-    color: var(--ok);
+    color: #8ac25a;
   }
 }
 
@@ -263,40 +307,58 @@
   color: var(--text-dim);
   font-family: ui-monospace, "Cascadia Mono", monospace;
   font-size: 10px;
+
+  /* Sobre la fila azul el gris atenuado no se lee. */
+  .tree__item.is-active & {
+    color: #d6e2f5;
+  }
 }
 
-/* ---------- Paleta de recursos ---------- */
-.tile {
+/* ---------- Paleta de recursos (asset browser) ---------- */
+.assets {
+  /* auto-fill con minimo de 64px: entran tantas miniaturas por fila como
+     permita el ancho del area, sin fijar el numero de columnas a mano. El alto
+     se topea para que la paleta no se coma el arbol de escena. */
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+  gap: 4px;
+  padding: 6px;
+  max-height: 176px;
+}
+
+.asset {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 5px 3px;
+  gap: 3px;
+  padding: 4px 2px;
   border: 1px solid transparent;
-  border-radius: 3px;
-  background: var(--bg-input);
+  border-radius: var(--radius);
+  background: var(--bg-panel);
   color: var(--text-dim);
   font: inherit;
   cursor: pointer;
 
   &:hover {
-    border-color: var(--border-soft);
+    background: #444;
   }
   &.is-active {
-    border-color: var(--accent);
+    border-color: var(--accent-hi);
+    background: #3f4a5e;
     color: var(--text-bright);
   }
 
   &__thumb {
-    width: 34px;
-    height: 34px;
-    border: 1px solid var(--border-soft);
+    width: 32px;
+    height: 32px;
+    border-radius: 2px;
     /* Tablero de ajedrez: el fondo canonico de transparencia en pixel art. */
     background-image:
-      linear-gradient(45deg, #2b313b 25%, transparent 25%),
-      linear-gradient(-45deg, #2b313b 25%, transparent 25%),
-      linear-gradient(45deg, transparent 75%, #2b313b 75%),
-      linear-gradient(-45deg, transparent 75%, #2b313b 75%);
+      linear-gradient(45deg, #4a4a4a 25%, transparent 25%),
+      linear-gradient(-45deg, #4a4a4a 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #4a4a4a 75%),
+      linear-gradient(-45deg, transparent 75%, #4a4a4a 75%);
+    background-color: #2e2e2e;
     background-size: 8px 8px;
     background-position: 0 0, 0 4px, 4px -4px, -4px 0;
     image-rendering: pixelated;
@@ -313,78 +375,73 @@
 
 /* ---------- Viewport ---------- */
 .viewport {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  min-height: 0;
-  background: var(--bg-deep);
+  background: var(--bg-viewport);
 }
 
-.toolbar {
+/* Grupo de botones pegados entre si: solo el primero y el ultimo llevan
+   esquinas redondeadas, como las filas de toggles del header de Blender. */
+.seg {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 8px;
-  background: var(--bg-head);
-  border-bottom: 1px solid var(--border);
 
-  &__group {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-  }
+  > * {
+    border-radius: 0;
 
-  &__sep {
-    width: 1px;
-    height: 18px;
-    background: var(--border-soft);
-  }
-
-  &__label {
-    color: var(--text-dim);
-    font-size: 10px;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-  }
-
-  &__hint {
-    color: var(--text-dim);
-    font-size: 10px;
+    &:first-child {
+      border-radius: var(--radius) 0 0 var(--radius);
+    }
+    &:last-child {
+      border-radius: 0 var(--radius) var(--radius) 0;
+    }
+    &:only-child {
+      border-radius: var(--radius);
+    }
   }
 }
 
+.head__sep {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: var(--border-soft);
+}
+
+.head__label {
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+/* Boton de header: el widget base de Blender. Gris claro, plano, redondeado, y
+   azul cuando esta encendido. */
 .tool {
-  min-width: 26px;
-  height: 24px;
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  height: 18px;
   padding: 0 6px;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  background: var(--bg-input);
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--widget);
   color: var(--text);
   font: inherit;
+  font-size: 11px;
+  line-height: 1;
   cursor: pointer;
 
   &:hover {
-    border-color: var(--border-soft);
+    background: var(--widget-hover);
   }
   &.is-active {
-    background: var(--accent-dim);
-    border-color: var(--accent);
+    background: var(--accent);
     color: var(--text-bright);
   }
   &--zoom {
     font-family: ui-monospace, "Cascadia Mono", monospace;
     font-size: 10px;
   }
-  &--wide {
-    padding: 0 9px;
-    font-size: 11px;
-  }
 }
 
-/* Contenedor del canvas. Es "relative" para que el overlay de chips se pueda
-   posicionar contra el, y "overflow: hidden" para que el canvas no desborde al
-   ampliar el zoom.
+/* Contenedor del canvas. Es "relative" para que los overlays se posicionen
+   contra el, y "overflow: hidden" para que el canvas no desborde al ampliar.
 
    Es tambien el elemento que mide el ResizeObserver de app.ts: el canvas no
    tiene tamano propio, lo toma de aca. Por eso se observa este div y no el
@@ -402,114 +459,353 @@
   height: 100%;
   /* Sin suavizado: el pixel art se ve a bordes duros aun al ampliar. */
   image-rendering: pixelated;
-  cursor: crosshair;
+  /* Flecha normal para seleccionar y cruz solo al colocar, como Blender:
+     el cursor dice que va a hacer el click. */
+  cursor: default;
+
+  &--place {
+    cursor: crosshair;
+  }
+
+  /* Va ultimo a proposito: durante un arrastre de camara el cursor de mano
+     cerrada gana sobre el de la herramienta activa, porque en ese momento el
+     gesto es desplazar, no colocar. */
+  &--panning {
+    cursor: grabbing;
+  }
 }
 
-/* Chips informativos (celda bajo el cursor, medidas de la grilla) apoyados
-   sobre la esquina inferior izquierda del canvas.
+/* Texto de la esquina superior izquierda del viewport: en Blender es la
+   coleccion y el objeto activo. Aca, el nivel y la entidad seleccionada.
 
-   "pointer-events: none" es imprescindible: sin eso los chips se comen los
-   clicks y no se podria colocar una entidad debajo de ellos. */
-.overlay {
+   "pointer-events: none" es imprescindible en los dos overlays: sin eso se
+   comen los clicks y no se podria colocar una entidad debajo de ellos. */
+.vp-info {
   position: absolute;
-  left: 8px;
-  bottom: 8px;
-  display: flex;
-  gap: 5px;
+  top: 8px;
+  left: 10px;
+  color: rgba(230, 230, 230, 0.55);
+  font-size: 11px;
   pointer-events: none;
 
-  &__chip {
-    padding: 2px 7px;
-    border: 1px solid var(--border-soft);
-    border-radius: 3px;
-    background: rgba(20, 23, 29, 0.85);
-    color: var(--text-dim);
+  &__active {
+    color: rgba(255, 255, 255, 0.85);
+  }
+}
+
+/* Chips de la esquina inferior izquierda (celda bajo el cursor, herramienta). */
+.vp-chips {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  display: flex;
+  gap: 4px;
+  pointer-events: none;
+
+  span {
+    padding: 1px 7px;
+    border-radius: var(--radius);
+    background: rgba(20, 20, 20, 0.6);
+    color: rgba(230, 230, 230, 0.7);
     font-family: ui-monospace, "Cascadia Mono", monospace;
     font-size: 10px;
   }
 }
 
-/* ---------- Inspector ---------- */
-.group {
-  margin-bottom: 12px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--border);
+/* ---------- Editor de propiedades ---------- */
+/* Columna de iconos a la izquierda + contenido a la derecha, igual que el
+   editor de propiedades de Blender. */
+.props {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  min-height: 0;
+}
 
-  &:last-child {
-    border-bottom: 0;
+.ptabs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0 0 3px;
+  background: var(--bg-header);
+}
+
+.ptab {
+  display: grid;
+  place-items: center;
+  width: 25px;
+  height: 25px;
+  border: 0;
+  border-radius: var(--radius) 0 0 var(--radius);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 13px;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--text);
   }
-
-  &__title {
-    margin-bottom: 6px;
-    color: var(--text-dim);
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.7px;
-  }
-
-  &--actions {
-    display: flex;
-    gap: 6px;
+  /* La pestana activa se funde con el fondo del contenido, sin subrayado. */
+  &.is-active {
+    background: var(--bg-editor);
+    color: var(--text-bright);
   }
 }
 
-.field {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 5px;
+.props__body {
+  min-height: 0;
+  overflow: auto;
+  padding: 4px;
+}
 
-  > span {
-    flex: 0 0 58px;
-    color: var(--text-dim);
-    font-size: 11px;
+/* Panel plegable. Cabecera con triangulo y cuerpo debajo, los dos con el mismo
+   redondeo: es la unidad con la que Blender organiza todo el inspector. */
+.panel {
+  margin-bottom: 4px;
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  overflow: hidden;
+
+  &__head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    height: 24px;
+    padding: 0 8px;
+    border: 0;
+    background: var(--bg-panel-head);
+    color: var(--text);
+    font: inherit;
+    font-weight: 500;
+    text-align: left;
+    cursor: pointer;
+
+    &:hover {
+      background: #4b4b4b;
+    }
   }
 
-  &--inline {
-    margin-bottom: 0;
+  /* El triangulo gira en vez de cambiar de caracter: un solo glifo, y la
+     transicion deja claro que es el mismo panel abriendose. */
+  &__arrow {
+    display: inline-block;
+    color: var(--text-dim);
+    font-size: 9px;
+    transition: transform 0.12s ease;
+    transform: rotate(90deg);
 
-    > span {
-      flex: 0 0 auto;
-      font-size: 10px;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+    &--collapsed {
+      transform: rotate(0deg);
+    }
+  }
+
+  &__count {
+    margin-left: auto;
+    color: var(--text-dim);
+    font-size: 10px;
+  }
+
+  &__body {
+    padding: 6px 8px 8px;
+  }
+
+  &--flat {
+    background: transparent;
+
+    > .panel__body {
+      padding: 6px 0;
     }
   }
 }
 
+/* ---------- Campos ----------
+   El campo de Blender: una pastilla redondeada con la etiqueta adentro a la
+   izquierda y el valor a la derecha, sin borde ni fondo separados. Es el
+   control mas caracteristico de su interfaz, y el que mas cambia la lectura
+   de todo el inspector.
+
+   Las flechas ◀ ▶ aparecen al pasar por encima, igual que las suyas. */
+.field {
+  display: flex;
+  align-items: center;
+  height: 20px;
+  margin-bottom: 3px;
+  padding: 0 8px;
+  border-radius: var(--radius);
+  background: var(--widget);
+  overflow: hidden;
+
+  &:hover {
+    background: var(--widget-hover);
+  }
+  &:focus-within {
+    background: var(--widget-sunken);
+    box-shadow: inset 0 0 0 1px var(--accent-hi);
+  }
+
+  > span {
+    flex: 0 0 auto;
+    max-width: 46%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text);
+    font-size: 11px;
+  }
+
+  /* Las flechas se reservan su hueco siempre (visibility, no display) para que
+     el valor no se corra un pixel al pasar el mouse. */
+  &::before,
+  &::after {
+    color: var(--text-dim);
+    font-size: 8px;
+    visibility: hidden;
+  }
+  &::before {
+    content: "◀";
+    margin-right: 2px;
+  }
+  &::after {
+    content: "▶";
+    margin-left: 2px;
+  }
+  &:hover::before,
+  &:hover::after {
+    visibility: visible;
+  }
+  /* Con el campo en edicion las flechas estorban: se van del todo. */
+  &:focus-within::before,
+  &:focus-within::after {
+    visibility: hidden;
+  }
+
+  /* Variante suelta para barras y filas de eventos: ahi el control va sin
+     pastilla, porque ya vive dentro de una fila con su propio fondo. */
+  &--inline {
+    height: auto;
+    margin-bottom: 0;
+    padding: 0;
+    background: transparent;
+    overflow: visible;
+
+    &:hover,
+    &:focus-within {
+      background: transparent;
+      box-shadow: none;
+    }
+    &::before,
+    &::after {
+      content: none;
+    }
+
+    > span {
+      margin-right: 6px;
+      color: var(--text-dim);
+      font-size: 10px;
+    }
+  }
+}
+
+/* Dos campos por fila (X/Y, ancho/alto). */
 .field-row {
   display: flex;
-  gap: 8px;
+  gap: 3px;
 
   .field {
     flex: 1;
     /* Sin esto los dos campos no bajan del ancho natural del input y el
-       segundo se sale del dock. */
+       segundo se sale del area. */
     min-width: 0;
-
-    > span {
-      flex: 0 0 34px;
-    }
   }
 }
 
 .input {
   flex: 1;
   min-width: 0;
-  height: 23px;
-  padding: 0 6px;
-  border: 1px solid var(--border-soft);
-  border-radius: 3px;
-  background: var(--bg-input);
+  height: 100%;
+  padding: 0 0 0 8px;
+  border: 0;
+  background: transparent;
   color: var(--text-bright);
   font: inherit;
-  font-family: ui-monospace, "Cascadia Mono", monospace;
   font-size: 11px;
 
   &:focus {
     outline: none;
-    border-color: var(--accent);
+  }
+
+  /* El valor numerico alineado a la derecha y la etiqueta a la izquierda: es lo
+     que hace legible una columna de campos de un vistazo. El texto libre
+     (nombres, rutas) se queda a la izquierda, que se lee mejor. */
+  &[type="number"] {
+    text-align: right;
+    padding-right: 0;
+    /* Las flechitas nativas de Chromium rompen la pastilla. */
+    -moz-appearance: textfield;
+    appearance: textfield;
+
+    &::-webkit-outer-spin-button,
+    &::-webkit-inner-spin-button {
+      appearance: none;
+      margin: 0;
+    }
+  }
+
+  /* Un <select> dentro de una pastilla se funde con ella: es un control mas
+     del campo, no una caja aparte. Su desplegable si necesita fondo propio,
+     porque Chromium no se lo hereda. */
+  &:is(select) {
+    padding-left: 6px;
+    cursor: pointer;
+
+    option {
+      background: var(--bg-header);
+      color: var(--text);
+    }
+  }
+}
+
+/* Un select solo (sin pastilla alrededor) en las barras. */
+.select-lone {
+  height: 18px;
+  min-width: 130px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--widget);
+  color: var(--text);
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--widget-hover);
+  }
+  option {
+    background: var(--bg-header);
+  }
+}
+
+.check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+
+  input {
+    accent-color: var(--accent);
+    margin: 0;
+  }
+}
+
+.hint {
+  margin: 5px 0 0;
+  color: var(--text-dim);
+  font-size: 10px;
+  line-height: 1.4;
+
+  &--warn {
+    color: #c9a24a;
   }
 }
 
@@ -525,178 +821,114 @@
   display: grid;
   place-items: center;
   padding: 20px;
-  background: rgba(8, 10, 13, 0.72);
+  background: rgba(0, 0, 0, 0.55);
 }
 
+/* Los popups de Blender si tienen esquinas redondeadas y una sombra marcada:
+   son lo unico que flota sobre la interfaz. */
 .modal {
-  width: min(430px, 100%);
-  border: 1px solid var(--border-soft);
-  border-top: 2px solid var(--accent);
-  background: var(--bg-panel);
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.45);
+  width: min(400px, 100%);
+  border-radius: 6px;
+  background: var(--bg-editor);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
 
   &__head {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
-    padding: 16px 18px 12px;
-    background: var(--bg-head);
-    border-bottom: 1px solid var(--border);
+    height: 26px;
+    padding: 0 6px 0 10px;
+    background: var(--bg-header);
+
+    h2 {
+      margin: 0;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 500;
+    }
   }
 
   &__body {
-    display: grid;
-    gap: 10px;
-    padding: 16px 18px 8px;
+    padding: 10px;
   }
 
   &__actions {
     display: flex;
-    justify-content: flex-end;
-    gap: 7px;
-    padding: 12px 18px 16px;
-    border-top: 1px solid var(--border);
+    gap: 4px;
+    padding: 4px 10px 10px;
+
+    /* Los botones de confirmacion de Blender ocupan el ancho completo y a
+       partes iguales. */
+    .btn {
+      flex: 1;
+      height: 24px;
+    }
   }
 }
 
-.eyebrow {
-  display: block;
-  margin-bottom: 3px;
-  color: var(--accent);
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-}
-
-.modal h2 {
-  margin: 0;
-  color: var(--text-bright);
-  font-size: 18px;
-  font-weight: 600;
-}
-
 .icon-button {
-  width: 26px;
-  height: 26px;
-  border: 1px solid transparent;
+  width: 20px;
+  height: 20px;
+  border: 0;
+  border-radius: 3px;
   background: transparent;
   color: var(--text-dim);
-  font-size: 19px;
+  font-size: 15px;
   line-height: 1;
   cursor: pointer;
 
   &:hover {
-    border-color: var(--border-soft);
-    color: var(--text-bright);
-  }
-}
-
-.check {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  cursor: pointer;
-  text-transform: none;
-  letter-spacing: 0;
-
-  input {
-    accent-color: var(--accent);
-  }
-}
-
-.hint {
-  margin: 4px 0 0;
-  color: var(--text-dim);
-  font-size: 10px;
-  line-height: 1.4;
-
-  &--warn {
-    color: #c9a24a;
-  }
-}
-
-/* ---------- Dock inferior / eventos ---------- */
-.tabs {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 0 8px;
-  background: var(--bg-head);
-  border-bottom: 1px solid var(--border);
-}
-
-.tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 12px;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: transparent;
-  color: var(--text-dim);
-  font: inherit;
-  font-size: 11px;
-  cursor: pointer;
-
-  &:hover {
+    background: var(--widget);
     color: var(--text);
   }
-  &.is-active {
-    color: var(--text-bright);
-    border-bottom-color: var(--accent);
-  }
 }
 
-.dock__body {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 8px;
+/* ---------- Editor de eventos / consola ---------- */
+.bottom {
+  height: 200px;
 }
 
 .event {
-  margin-bottom: 8px;
-  border: 1px solid var(--border);
-  border-radius: 3px;
-  background: var(--bg-panel-alt);
+  margin-bottom: 4px;
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  overflow: hidden;
 
   &__row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 8px;
+    gap: 6px;
+    padding: 5px 8px;
 
     &--child {
-      padding-left: 26px;
-      border-top: 1px solid var(--border);
+      padding-left: 24px;
+      border-top: 1px solid #2e2e2e;
     }
   }
 }
 
 /* Etiquetas "Cuando" / "Entonces" de cada fila de evento. Los dos colores no
-   son decorativos: separan de un vistazo la causa (ambar, el acento del editor)
-   del efecto (azul), que es la lectura basica de un evento NoCode. */
+   son decorativos: separan de un vistazo la causa del efecto, que es la
+   lectura basica de un evento NoCode. */
 .badge {
-  padding: 2px 7px;
-  border-radius: 2px;
+  padding: 1px 7px;
+  border-radius: var(--radius);
   font-size: 10px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  font-weight: 500;
 
   &--trigger {
-    background: var(--accent-dim);
-    color: #f7c46c;
+    background: #5c4520;
+    color: #f0c07a;
   }
   &--action {
-    background: #1d3a4d;
-    color: #6fb6df;
+    background: #2c4468;
+    color: #9dc0ee;
   }
 }
 
-/* Consola de la pestana Salida: el log que llena note() en app.ts. Monoespaciada
-   porque casi siempre muestra rutas y nombres de archivo. */
+/* Consola de la workspace Salida: el log que llena note() en app.ts.
+   Monoespaciada porque casi siempre muestra rutas y nombres de archivo. */
 .console {
   font-family: ui-monospace, "Cascadia Mono", monospace;
   font-size: 11px;
@@ -709,85 +941,94 @@
        app.ts queda limpio, sin caracteres de presentacion. */
     &::before {
       content: "› ";
-      color: var(--accent);
+      color: var(--accent-hi);
     }
   }
 }
 
-/* ---------- Barra de estado ---------- */
+.pad {
+  padding: 6px;
+}
+
+/* ---------- Barra de estado ----------
+   La de Blender: pistas de teclado y raton a la izquierda, estadisticas de la
+   escena a la derecha, y ni un borde. */
 .statusbar {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 14px;
   padding: 0 10px;
-  background: var(--bg-head);
-  border-top: 1px solid var(--border);
+  background: var(--bg-window);
+  color: var(--text-dim);
   font-size: 11px;
 
   &__msg {
-    color: var(--text-dim);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
+  &__stat {
+    white-space: nowrap;
+
+    &--warn {
+      color: #d8a13c;
+    }
+  }
 }
 
-/* Capsulas de solo lectura de la barra de estado y la barra superior
-   (contadores, ruta del proyecto). La variante --warn las pinta de ambar: la usa
-   el contador de entidades al pasar el umbral que avisa antes de comprometer
-   los FPS del runtime (ENTITY_WARN_THRESHOLD en app.ts). */
-.pill {
-  padding: 1px 8px;
-  border: 1px solid var(--border-soft);
-  border-radius: 9px;
-  background: var(--bg-input);
-  color: var(--text-dim);
-  font-size: 10px;
+/* Pista de raton/teclado: la tecla en una capsula y su accion al lado. */
+.keyhint {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   white-space: nowrap;
 
-  &--warn {
-    border-color: var(--accent);
-    color: var(--accent);
+  b {
+    padding: 0 4px;
+    border-radius: 3px;
+    background: #333;
+    color: var(--text);
+    font-weight: 500;
+    font-size: 10px;
   }
 }
 
 /* ---------- Botones ----------
-   .btn es el boton de la interfaz en general (barras y dialogos); .tool, mas
-   arriba, es el de la barra del viewport. Se distinguen porque los .tool viven
-   apretados en grupos y marcan estado con is-active, y los .btn no. */
+   .btn es el boton de dialogos y barras generales; .tool, mas arriba, es el de
+   las cabeceras de area. Comparten fondo y redondez: en Blender son el mismo
+   widget con distinto alto. */
 .btn {
-  height: 24px;
-  padding: 0 11px;
-  border: 1px solid var(--border-soft);
-  border-radius: 3px;
-  background: var(--bg-panel-alt);
+  height: 20px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--widget);
   color: var(--text);
   font: inherit;
   font-size: 11px;
   cursor: pointer;
 
   &:hover {
-    background: #2b313c;
-    color: var(--text-bright);
+    background: var(--widget-hover);
   }
 
   &--primary {
-    border-color: var(--accent);
-    background: var(--accent-dim);
-    color: #ffd694;
+    background: var(--accent);
+    color: var(--text-bright);
 
     &:hover {
-      background: #8d6015;
+      background: var(--accent-hi);
     }
   }
 
   &--danger:hover {
-    border-color: var(--danger);
-    color: #ff9a9a;
+    background: var(--danger);
+    color: var(--text-bright);
   }
 
   &--small {
-    height: 20px;
+    height: 18px;
     padding: 0 8px;
     font-size: 10px;
   }
@@ -795,33 +1036,34 @@
 
 .empty {
   margin: 0;
-  padding: 12px 10px;
+  padding: 10px;
   color: var(--text-dim);
   font-size: 11px;
   line-height: 1.5;
   /* En la paleta de recursos el contenedor es un grid de columnas angostas:
-     sin esto el mensaje cae dentro de una columna de 66px y se parte letra
+     sin esto el mensaje cae dentro de una columna de 64px y se parte letra
      a letra. */
   grid-column: 1 / -1;
 }
 
 /* ---------- Scrollbars ----------
-   Las barras de scroll nativas de Windows son claras y cortan el tema oscuro.
-   Esto es propietario de WebKit/Chromium, lo que aca alcanza: el editor corre
-   siempre sobre Electron. */
+   Finas y sin pista visible, como las de Blender. Esto es propietario de
+   WebKit/Chromium, lo que aca alcanza: el editor corre siempre sobre Electron. */
 ::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
+  width: 11px;
+  height: 11px;
 }
 ::-webkit-scrollbar-track {
-  background: var(--bg-deep);
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  border: 2px solid var(--bg-deep);
-  border-radius: 5px;
-  background: #3a414e;
+  border: 3px solid transparent;
+  border-radius: 6px;
+  background: #545454;
+  background-clip: content-box;
 
   &:hover {
-    background: #4a5261;
+    background: #6b6b6b;
+    background-clip: content-box;
   }
 }

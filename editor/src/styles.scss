@@ -1,10 +1,11 @@
-/* Base global del editor. El resto del tema vive en app.scss. */
+/* Base global del editor. El resto del tema vive en app.scss.
+   El gris es el de la ventana de Blender: neutro, sin nada de azul. */
 html,
 body {
   height: 100%;
   margin: 0;
   overflow: hidden;
-  background: #14171d;
-  color: #c7cdd8;
-  font-family: "Segoe UI", Inter, system-ui, sans-serif;
+  background: #1d1d1d;
+  color: #e5e5e5;
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
 }

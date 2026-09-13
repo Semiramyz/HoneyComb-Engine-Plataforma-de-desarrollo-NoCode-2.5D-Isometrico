@@ -1,16 +1,20 @@
 <!--
-  Plantilla del editor. Una sola pantalla con docks fijos, al estilo Godot:
+  Plantilla del editor. La ventana se arma como la de Blender: un topbar con
+  menus y pestanas de workspace, y debajo AREAS -- editores independientes,
+  cada uno con su propia cabecera de 26px -- separadas por un surco de 2px.
 
     +-----------------------------------------------------+
-    |  barra superior (proyecto, nivel, guardar)           |
+    |  topbar: menus  |  Layout · Eventos · Salida         |
     +-----------+-----------------------------+-----------+
-    |  escena   |                             |           |
-    |  recursos |         viewport            | inspector |
-    |           |     (canvas isometrico)     |           |
+    | outliner  | ⊞ cabecera del viewport     | ⚙ props   |
+    | (escena)  +-----------------------------+ +---------+
+    +-----------+                             | |t| campos|
+    | recursos  |     canvas isometrico       | |a|       |
+    |           |                             | |b|       |
     +-----------+-----------------------------+-----------+
-    |  eventos / salida                                   |
+    |  editor inferior (eventos / salida), segun workspace |
     +-----------------------------------------------------+
-    |  barra de estado                                    |
+    |  barra de estado: pistas de teclas | estadisticas    |
     +-----------------------------------------------------+
 
   Todo lee de signals del componente (app.ts) y escribe llamando a sus metodos;
@@ -18,44 +22,40 @@
   moderna de Angular (@if / @for / @empty), no las directivas *ngIf / *ngFor.
 -->
 <div class="shell">
-  <!-- ===================== BARRA SUPERIOR ===================== -->
-  <header class="menubar">
+  <!-- ===================== TOPBAR ===================== -->
+  <header class="topbar">
     <div class="brand">
       <span class="brand__mark">⬢</span>
       <span class="brand__name">HoneyComb</span>
-      <span class="brand__sub">Engine</span>
     </div>
 
-    <div class="menubar__group">
-      <button class="btn" (click)="openProject()">Abrir proyecto</button>
-      <button class="btn" (click)="newLevel()">Nivel nuevo</button>
-      <button class="btn btn--primary" (click)="save()">
-        Guardar{{ dirty() ? ' *' : '' }}
+    <button class="menu" (click)="openProject()">Archivo</button>
+    <button class="menu" (click)="newLevel()">Nuevo</button>
+    <button class="menu" (click)="save()">Guardar{{ dirty() ? ' *' : '' }}</button>
+    <button class="menu" (click)="frameAll()">Vista</button>
+
+    <!-- Pestanas de workspace: no cambian de pantalla, cambian que editores
+         estan abiertos (ver el tipo Workspace en app.ts). -->
+    <nav class="wstabs">
+      <button class="wstab" [class.is-active]="workspace() === 'layout'" (click)="workspace.set('layout')">
+        Layout
       </button>
-    </div>
+      <button class="wstab" [class.is-active]="workspace() === 'eventos'" (click)="workspace.set('eventos')">
+        Eventos
+      </button>
+      <button class="wstab" [class.is-active]="workspace() === 'salida'" (click)="workspace.set('salida')">
+        Salida
+      </button>
+    </nav>
 
-    <div class="menubar__group">
-      <label class="field field--inline">
-        <span>Nivel</span>
-        <select
-          class="input"
-          [value]="levels.fileName() ?? ''"
-          (change)="loadLevel(str($event))"
-        >
-          <option value="" disabled>— seleccionar —</option>
-          @for (file of levelFiles(); track file) {
-            <option [value]="file">{{ file }}</option>
-          }
-        </select>
-      </label>
-    </div>
+    <div class="topbar__spacer"></div>
 
-    <div class="menubar__spacer"></div>
-
-    @if (!hasFileSystem) {
-      <span class="pill pill--warn">Modo navegador · sin acceso a disco</span>
-    }
-    <span class="pill">{{ project.projectRoot() ?? 'Sin proyecto' }}</span>
+    <select class="select-lone" [value]="levels.fileName() ?? ''" (change)="loadLevel(str($event))">
+      <option value="" disabled>— nivel —</option>
+      @for (file of levelFiles(); track file) {
+        <option [value]="file">{{ file }}</option>
+      }
+    </select>
   </header>
 
   <!-- Dialogo de nivel nuevo. Click en el fondo cierra; el stopPropagation del
@@ -65,20 +65,16 @@
       <section class="modal" role="dialog" aria-modal="true" aria-labelledby="new-level-title"
                (click)="$event.stopPropagation()">
         <div class="modal__head">
-          <div>
-            <span class="eyebrow">Inicializar escena</span>
-            <h2 id="new-level-title">Crear nivel</h2>
-          </div>
+          <h2 id="new-level-title">Crear nivel</h2>
           <button class="icon-button" type="button" title="Cerrar" (click)="cancelNewLevel()">×</button>
         </div>
 
         <div class="modal__body">
           <label class="field">
-            <span>Nombre del nivel</span>
+            <span>Nombre</span>
             <input class="input" [value]="newLevelName()" (input)="newLevelName.set(str($event))" autofocus />
           </label>
 
-          <div class="group__title">Dimensiones de grilla</div>
           <div class="field-row">
             <label class="field">
               <span>Ancho</span>
@@ -106,14 +102,14 @@
           </div>
 
           <label class="field">
-            <span>Plantilla inicial</span>
-            <select class="input" [value]="newLevelTemplate()"
-                  (change)="setNewLevelTemplate(str($event))">
+            <span>Plantilla</span>
+            <select class="input" [value]="newLevelTemplate()" (change)="setNewLevelTemplate(str($event))">
               <option value="empty">Grilla vacia</option>
               <option value="player">Jugador</option>
               <option value="test-scene">Escena de prueba</option>
             </select>
           </label>
+
           @if (textures().length === 0) {
             <p class="hint">Las plantillas usaran textures/player.png. Abre un proyecto antes de guardar el nivel.</p>
           } @else {
@@ -129,30 +125,30 @@
     </div>
   }
 
-  <!-- ===================== CUERPO ===================== -->
+  <!-- ===================== CUERPO: TRES AREAS ===================== -->
   <div class="body">
-    <!-- --------- DOCK IZQUIERDO: arbol de escena + paleta de recursos --------- -->
-    <aside class="dock dock--left">
-      <section class="panel panel--grow">
-        <div class="panel__head">
-          <span>Escena</span>
-          <span class="panel__count">{{ entities().length }}</span>
+    <!-- --------- AREA IZQUIERDA: outliner + recursos --------- -->
+    <div class="stack">
+      <section class="area">
+        <div class="area__head">
+          <span class="area__kind" title="Outliner">☰</span>
+          <span class="area__title">Escena</span>
+          <div class="head__spacer"></div>
+          <span class="area__title">{{ entities().length }}</span>
         </div>
-        <div class="panel__body panel__body--list">
-          <button
-            class="tree__item tree__item--root"
-            [class.is-active]="!selected()"
-            (click)="selectEntity(null)"
-          >
-            <span class="tree__icon">◈</span>{{ levels.level().name }}
+
+        <div class="area__body tree">
+          <!-- Raiz del arbol: deseleccionar todo. Las entidades cuelgan de ella
+               con sangria, como los objetos bajo una coleccion en Blender. -->
+          <button class="tree__item tree__item--root" [class.is-active]="!selected()"
+                  (click)="selectEntity(null)">
+            <span class="tree__icon">▾</span>{{ levels.level().name }}
           </button>
 
           @for (entity of entities(); track entity.id) {
-            <button
-              class="tree__item"
-              [class.is-active]="selected()?.id === entity.id"
-              (click)="selectEntity(entity.id)"
-            >
+            <button class="tree__item tree__item--child"
+                    [class.is-active]="selected()?.id === entity.id"
+                    (click)="selectEntity(entity.id)">
               <span class="tree__icon tree__icon--{{ entity.type }}">▣</span>
               <span class="tree__label">{{ entity.id }}</span>
               <span class="tree__meta">{{ entity.position.col }},{{ entity.position.row }}</span>
@@ -163,286 +159,350 @@
         </div>
       </section>
 
-      <section class="panel">
-        <div class="panel__head">
-          <span>Recursos</span>
-          <span class="panel__count">{{ textures().length }}</span>
+      <section class="area">
+        <div class="area__head">
+          <span class="area__kind" title="Asset Browser">▦</span>
+          <span class="area__title">Recursos</span>
+          <div class="head__spacer"></div>
+          <span class="area__title">{{ textures().length }}</span>
         </div>
-        <div class="panel__body panel__body--tiles">
+
+        <div class="area__body assets">
           @for (texture of textures(); track texture) {
-            <button
-              class="tile"
-              [class.is-active]="activeTexture() === texture"
-              (click)="selectTexture(texture)"
-              [title]="texture"
-            >
-              <span class="tile__thumb"></span>
-              <span class="tile__name">{{ texture }}</span>
+            <button class="asset" [class.is-active]="activeTexture() === texture"
+                    (click)="selectTexture(texture)" [title]="texture">
+              <span class="asset__thumb"></span>
+              <span class="asset__name">{{ texture }}</span>
             </button>
           } @empty {
             <p class="empty">assets/textures/ vacio o proyecto sin abrir.</p>
           }
         </div>
       </section>
-    </aside>
+    </div>
 
-    <!-- --------- VIEWPORT --------- -->
-    <main class="viewport">
-      <div class="toolbar">
-        <div class="toolbar__group">
-          <button
-            class="tool"
-            [class.is-active]="tool() === 'select'"
-            (click)="tool.set('select')"
-            title="Seleccionar"
-          >
-            ▶
-          </button>
-          <button
-            class="tool"
-            [class.is-active]="tool() === 'place'"
-            (click)="tool.set('place')"
-            title="Colocar entidad"
-          >
-            ✚
-          </button>
-          <button class="tool" [class.is-active]="tool() === 'floor'" (click)="tool.set('floor')" title="Alternar piso">▱</button>
-          <button class="tool" [class.is-active]="tool() === 'wall'" (click)="tool.set('wall')" title="Alternar pared">▥</button>
+    <!-- --------- AREA CENTRAL: viewport isometrico --------- -->
+    <section class="area viewport">
+      <div class="area__head">
+        <span class="area__kind" title="Viewport isometrico">⊞</span>
+
+        <div class="seg">
+          <button class="tool" [class.is-active]="tool() === 'select'" (click)="tool.set('select')"
+                  title="Seleccionar">▶</button>
+          <button class="tool" [class.is-active]="tool() === 'place'" (click)="tool.set('place')"
+                  title="Colocar entidad">✚</button>
+          <button class="tool" [class.is-active]="tool() === 'floor'" (click)="tool.set('floor')"
+                  title="Alternar piso">▱</button>
+          <button class="tool" [class.is-active]="tool() === 'wall'" (click)="tool.set('wall')"
+                  title="Alternar pared">▥</button>
         </div>
 
-        <div class="toolbar__sep"></div>
+        <span class="head__sep"></span>
 
-        <div class="toolbar__group">
-          <span class="toolbar__label">Zoom</span>
+        <!-- Toggles de overlay: en Blender viven juntos y encendidos se ponen
+             azules, que es exactamente lo que hace .tool.is-active. -->
+        <div class="seg">
+          <button class="tool" [class.is-active]="showGrid()" (click)="toggleGrid()"
+                  title="Mostrar grilla">Grilla</button>
+          <button class="tool" [class.is-active]="showColliders()" (click)="toggleColliders()"
+                  title="Mostrar colisiones">Colisiones</button>
+        </div>
+
+        <span class="head__sep"></span>
+
+        <span class="head__label">Zoom</span>
+        <div class="seg">
           @for (step of zoomSteps; track step) {
             <button class="tool tool--zoom" [class.is-active]="zoom() === step" (click)="setZoom(step)">
               {{ step }}x
             </button>
           }
         </div>
+        <button class="tool" (click)="frameAll()" title="Encuadrar todo (Inicio)">Encuadrar</button>
 
-        <div class="toolbar__sep"></div>
-
-        <div class="toolbar__group">
-          <button class="tool tool--wide" [class.is-active]="showGrid()" (click)="toggleGrid()">
-            Grilla
-          </button>
-          <button class="tool tool--wide" [class.is-active]="showColliders()" (click)="toggleColliders()">
-            Colisiones
-          </button>
-          <button class="tool tool--wide" (click)="resetView()">Centrar</button>
-        </div>
-
-        <div class="toolbar__spacer"></div>
-
-        <span class="toolbar__hint">Shift + arrastrar para desplazar</span>
+        <div class="head__spacer"></div>
+        <span class="head__label">{{ zoomLabel() }}</span>
       </div>
 
       <!-- El canvas no tiene width/height en el HTML: se los fija draw() con
            lo que mide el contenedor (ver el ResizeObserver en app.ts). Los
-           eventos de puntero cubren las tres cosas: seleccionar, colocar y
-           desplazar la vista. -->
+           eventos de puntero cubren seleccionar, colocar y desplazar; la rueda
+           hace zoom anclado al cursor. -->
       <div class="canvas-host">
         <canvas
           #viewport
           class="canvas"
+          [class.canvas--place]="tool() !== 'select'"
+          [class.canvas--panning]="panning()"
           (pointerdown)="onPointerDown($event)"
           (pointermove)="onPointerMove($event)"
           (pointerup)="onPointerUp($event)"
           (pointerleave)="onPointerLeave()"
+          (wheel)="onWheel($event)"
+          (contextmenu)="onContextMenu($event)"
         ></canvas>
 
-        <div class="overlay">
-          @if (hovered(); as cell) {
-            <span class="overlay__chip">celda {{ cell.col }}, {{ cell.row }}</span>
+        <!-- Nivel y objeto activo arriba a la izquierda, como el texto de
+             coleccion/objeto del viewport de Blender. -->
+        <div class="vp-info">
+          {{ levels.level().name }}
+          @if (selected(); as entity) {
+            <span class="vp-info__active"> | {{ entity.id }}</span>
           }
-          <span class="overlay__chip">
-            grilla {{ grid().width }}×{{ grid().height }} · tile {{ grid().tileWidth }}×{{ grid().tileHeight }}
-          </span>
+        </div>
+
+        <div class="vp-chips">
+          @if (hovered(); as cell) {
+            <span>{{ cell.col }}, {{ cell.row }}</span>
+          }
+          @if (tool() === 'place') {
+            <span>colocar · {{ activeTexture() ?? 'sin textura' }}</span>
+          }
         </div>
       </div>
-    </main>
+    </section>
 
-    <!-- --------- INSPECTOR ---------
-         Propiedades de la entidad seleccionada; si no hay ninguna, cae a las
-         propiedades del nivel (nombre y grilla). Cada control escribe con un
-         patch* del componente, nunca directo sobre el objeto del nivel. -->
-    <aside class="dock dock--right">
-      <section class="panel panel--grow">
-        <div class="panel__head">
-          <span>Inspector</span>
-        </div>
+    <!-- --------- AREA DERECHA: editor de propiedades ---------
+         Columna de pestanas a la izquierda (objeto / escena) y paneles
+         plegables a la derecha, como el Properties editor de Blender. Cada
+         control escribe con un patch* del componente, nunca directo sobre el
+         objeto del nivel. -->
+    <section class="area">
+      <div class="area__head">
+        <span class="area__kind" title="Propiedades">⚙</span>
+        <span class="area__title">Propiedades</span>
+      </div>
 
-        <div class="panel__body panel__body--form">
-          @if (selected(); as entity) {
-            <div class="group">
-              <div class="group__title">Entidad</div>
-              <label class="field">
-                <span>ID</span>
-                <input class="input" [value]="entity.id" (change)="patchEntity({ id: str($event) })" />
-              </label>
-              <label class="field">
-                <span>Tipo</span>
-                <input class="input" [value]="entity.type" (change)="patchEntity({ type: str($event) })" />
-              </label>
-              <label class="field">
-                <span>Textura</span>
-                <input
-                  class="input"
-                  [value]="entity.texture"
-                  (change)="patchEntity({ texture: str($event) })"
-                />
-              </label>
-            </div>
+      <div class="area__body props">
+        <nav class="ptabs">
+          <button class="ptab" [class.is-active]="inspectorTab() === 'objeto'"
+                  (click)="inspectorTab.set('objeto')" title="Objeto">▣</button>
+          <button class="ptab" [class.is-active]="inspectorTab() === 'escena'"
+                  (click)="inspectorTab.set('escena')" title="Escena">⊞</button>
+        </nav>
 
-            <div class="group">
-              <div class="group__title">Posicion en grilla</div>
-              <div class="field-row">
-                <label class="field">
-                  <span>Col</span>
-                  <input
-                    class="input"
-                    type="number"
-                    step="1"
-                    [value]="entity.position.col"
-                    (input)="patchPosition('col', int($event))"
-                  />
-                </label>
-                <label class="field">
-                  <span>Row</span>
-                  <input
-                    class="input"
-                    type="number"
-                    step="1"
-                    [value]="entity.position.row"
-                    (input)="patchPosition('row', int($event))"
-                  />
-                </label>
-              </div>
-            </div>
+        <div class="props__body">
+          @if (inspectorTab() === 'objeto') {
+            @if (selected(); as entity) {
+              <section class="panel">
+                <button class="panel__head" (click)="togglePanel('obj')">
+                  <span class="panel__arrow" [class.panel__arrow--collapsed]="isCollapsed('obj')">▶</span>
+                  Objeto
+                </button>
+                @if (!isCollapsed('obj')) {
+                  <div class="panel__body">
+                    <label class="field">
+                      <span>ID</span>
+                      <input class="input" [value]="entity.id" (change)="patchEntity({ id: str($event) })" />
+                    </label>
+                    <label class="field">
+                      <span>Tipo</span>
+                      <input class="input" [value]="entity.type" (change)="patchEntity({ type: str($event) })" />
+                    </label>
+                    <label class="field">
+                      <span>Textura</span>
+                      <input class="input" [value]="entity.texture"
+                             (change)="patchEntity({ texture: str($event) })" />
+                    </label>
+                  </div>
+                }
+              </section>
 
-            <div class="group">
-              <div class="group__title">Source rect (spritesheet)</div>
-              <div class="field-row">
-                <label class="field">
-                  <span>X</span>
-                  <input class="input" type="number" step="1" [value]="entity.sourceRect.x"
-                         (input)="patchSourceRect('x', int($event))" />
-                </label>
-                <label class="field">
-                  <span>Y</span>
-                  <input class="input" type="number" step="1" [value]="entity.sourceRect.y"
-                         (input)="patchSourceRect('y', int($event))" />
-                </label>
-              </div>
-              <div class="field-row">
-                <label class="field">
-                  <span>Ancho</span>
-                  <input class="input" type="number" step="1" [value]="entity.sourceRect.width"
-                         (input)="patchSourceRect('width', int($event))" />
-                </label>
-                <label class="field">
-                  <span>Alto</span>
-                  <input class="input" type="number" step="1" [value]="entity.sourceRect.height"
-                         (input)="patchSourceRect('height', int($event))" />
-                </label>
-              </div>
-            </div>
+              <section class="panel">
+                <button class="panel__head" (click)="togglePanel('transform')">
+                  <span class="panel__arrow" [class.panel__arrow--collapsed]="isCollapsed('transform')">▶</span>
+                  Transformacion
+                </button>
+                @if (!isCollapsed('transform')) {
+                  <div class="panel__body">
+                    <label class="field">
+                      <span>Columna</span>
+                      <input class="input" type="number" step="1" [value]="entity.position.col"
+                             (input)="patchPosition('col', int($event))" />
+                    </label>
+                    <label class="field">
+                      <span>Fila</span>
+                      <input class="input" type="number" step="1" [value]="entity.position.row"
+                             (input)="patchPosition('row', int($event))" />
+                    </label>
+                  </div>
+                }
+              </section>
 
-            <div class="group">
-              <div class="group__title">
-                <label class="check">
-                  <input type="checkbox" [checked]="!!entity.collider"
-                         (change)="toggleCollider(checked($event))" />
-                  <span>Collider</span>
-                </label>
-              </div>
-              @if (entity.collider; as collider) {
-                <div class="field-row">
+              <section class="panel">
+                <button class="panel__head" (click)="togglePanel('sprite')">
+                  <span class="panel__arrow" [class.panel__arrow--collapsed]="isCollapsed('sprite')">▶</span>
+                  Sprite
+                </button>
+                @if (!isCollapsed('sprite')) {
+                  <div class="panel__body">
+                    <div class="field-row">
+                      <label class="field">
+                        <span>X</span>
+                        <input class="input" type="number" step="1" [value]="entity.sourceRect.x"
+                               (input)="patchSourceRect('x', int($event))" />
+                      </label>
+                      <label class="field">
+                        <span>Y</span>
+                        <input class="input" type="number" step="1" [value]="entity.sourceRect.y"
+                               (input)="patchSourceRect('y', int($event))" />
+                      </label>
+                    </div>
+                    <div class="field-row">
+                      <label class="field">
+                        <span>W</span>
+                        <input class="input" type="number" step="1" [value]="entity.sourceRect.width"
+                               (input)="patchSourceRect('width', int($event))" />
+                      </label>
+                      <label class="field">
+                        <span>H</span>
+                        <input class="input" type="number" step="1" [value]="entity.sourceRect.height"
+                               (input)="patchSourceRect('height', int($event))" />
+                      </label>
+                    </div>
+                  </div>
+                }
+              </section>
+
+              <section class="panel">
+                <button class="panel__head" (click)="togglePanel('collider')">
+                  <span class="panel__arrow" [class.panel__arrow--collapsed]="isCollapsed('collider')">▶</span>
+                  Fisica
+                </button>
+                @if (!isCollapsed('collider')) {
+                  <div class="panel__body">
+                    <label class="check">
+                      <input type="checkbox" [checked]="!!entity.collider"
+                             (change)="toggleCollider(checked($event))" />
+                      <span>Collider</span>
+                    </label>
+                    @if (entity.collider; as collider) {
+                      <div class="field-row" style="margin-top: 6px">
+                        <label class="field">
+                          <span>W</span>
+                          <input class="input" type="number" step="1" [value]="collider.width"
+                                 (input)="patchCollider('width', int($event))" />
+                        </label>
+                        <label class="field">
+                          <span>H</span>
+                          <input class="input" type="number" step="1" [value]="collider.height"
+                                 (input)="patchCollider('height', int($event))" />
+                        </label>
+                      </div>
+                    }
+                  </div>
+                }
+              </section>
+
+              <section class="panel">
+                <button class="panel__head" (click)="togglePanel('anim')">
+                  <span class="panel__arrow" [class.panel__arrow--collapsed]="isCollapsed('anim')">▶</span>
+                  Animacion
+                </button>
+                @if (!isCollapsed('anim')) {
+                  <div class="panel__body">
+                    <label class="field">
+                      <span>Clip</span>
+                      <input class="input" [value]="entity.animation ?? ''" placeholder="player_idle"
+                             (change)="patchEntity({ animation: str($event) || undefined })" />
+                    </label>
+                    <p class="hint hint--warn">
+                      Los frames del clip todavia estan escritos a mano en main.cpp; el JSON solo
+                      guarda el nombre.
+                    </p>
+                  </div>
+                }
+              </section>
+
+              <section class="panel panel--flat">
+                <div class="panel__body">
+                  <div class="field-row">
+                    <button class="btn" style="flex: 1" (click)="duplicateSelected()">Duplicar</button>
+                    <button class="btn btn--danger" style="flex: 1" (click)="deleteSelected()">Eliminar</button>
+                  </div>
+                </div>
+              </section>
+            } @else {
+              <p class="empty">Sin objeto activo. Selecciona una entidad en la escena o en el viewport.</p>
+            }
+          } @else {
+            <section class="panel">
+              <button class="panel__head" (click)="togglePanel('level')">
+                <span class="panel__arrow" [class.panel__arrow--collapsed]="isCollapsed('level')">▶</span>
+                Nivel
+              </button>
+              @if (!isCollapsed('level')) {
+                <div class="panel__body">
                   <label class="field">
-                    <span>Ancho</span>
-                    <input class="input" type="number" step="1" [value]="collider.width"
-                           (input)="patchCollider('width', int($event))" />
-                  </label>
-                  <label class="field">
-                    <span>Alto</span>
-                    <input class="input" type="number" step="1" [value]="collider.height"
-                           (input)="patchCollider('height', int($event))" />
+                    <span>Nombre</span>
+                    <input class="input" [value]="levels.level().name" (change)="renameLevel(str($event))" />
                   </label>
                 </div>
               }
-            </div>
+            </section>
 
-            <div class="group">
-              <div class="group__title">Animacion</div>
-              <label class="field">
-                <span>Clip</span>
-                <input
-                  class="input"
-                  [value]="entity.animation ?? ''"
-                  placeholder="player_idle"
-                  (change)="patchEntity({ animation: str($event) || undefined })"
-                />
-              </label>
-              <p class="hint hint--warn">
-                Los frames del clip todavia estan escritos a mano en main.cpp; el JSON solo guarda
-                el nombre.
-              </p>
-            </div>
+            <section class="panel">
+              <button class="panel__head" (click)="togglePanel('grid')">
+                <span class="panel__arrow" [class.panel__arrow--collapsed]="isCollapsed('grid')">▶</span>
+                Grilla
+              </button>
+              @if (!isCollapsed('grid')) {
+                <div class="panel__body">
+                  <div class="field-row">
+                    <label class="field">
+                      <span>Ancho</span>
+                      <input class="input" type="number" step="1" min="1" [value]="grid().width"
+                             (input)="patchGrid({ width: int($event) })" />
+                    </label>
+                    <label class="field">
+                      <span>Alto</span>
+                      <input class="input" type="number" step="1" min="1" [value]="grid().height"
+                             (input)="patchGrid({ height: int($event) })" />
+                    </label>
+                  </div>
+                  <div class="field-row">
+                    <label class="field">
+                      <span>Tile W</span>
+                      <input class="input" type="number" step="1" min="1" [value]="grid().tileWidth"
+                             (input)="patchGrid({ tileWidth: int($event) })" />
+                    </label>
+                    <label class="field">
+                      <span>Tile H</span>
+                      <input class="input" type="number" step="1" min="1" [value]="grid().tileHeight"
+                             (input)="patchGrid({ tileHeight: int($event) })" />
+                    </label>
+                  </div>
+                  <p class="hint">Proporcion 2:1 (64×32) es el estandar de pixel art isometrico.</p>
+                </div>
+              }
+            </section>
 
-            <div class="group group--actions">
-              <button class="btn" (click)="duplicateSelected()">Duplicar</button>
-              <button class="btn btn--danger" (click)="deleteSelected()">Eliminar</button>
-            </div>
-          } @else {
-            <div class="group">
-              <div class="group__title">Nivel</div>
-              <label class="field">
-                <span>Nombre</span>
-                <input class="input" [value]="levels.level().name" (change)="renameLevel(str($event))" />
-              </label>
-            </div>
-
-            <div class="group">
-              <div class="group__title">Grilla</div>
-              <div class="field-row">
-                <label class="field">
-                  <span>Ancho</span>
-                  <input class="input" type="number" step="1" min="1" [value]="grid().width"
-                         (input)="patchGrid({ width: int($event) })" />
-                </label>
-                <label class="field">
-                  <span>Alto</span>
-                  <input class="input" type="number" step="1" min="1" [value]="grid().height"
-                         (input)="patchGrid({ height: int($event) })" />
-                </label>
-              </div>
-              <div class="field-row">
-                <label class="field">
-                  <span>Tile W</span>
-                  <input class="input" type="number" step="1" min="1" [value]="grid().tileWidth"
-                         (input)="patchGrid({ tileWidth: int($event) })" />
-                </label>
-                <label class="field">
-                  <span>Tile H</span>
-                  <input class="input" type="number" step="1" min="1" [value]="grid().tileHeight"
-                         (input)="patchGrid({ tileHeight: int($event) })" />
-                </label>
-              </div>
-              <p class="hint">
-                Proporcion 2:1 (64×32) es el estandar de pixel art isometrico.
-              </p>
-            </div>
-
-            <p class="empty">Selecciona una entidad en el arbol de Escena para editarla.</p>
+            <section class="panel">
+              <button class="panel__head" (click)="togglePanel('project')">
+                <span class="panel__arrow" [class.panel__arrow--collapsed]="isCollapsed('project')">▶</span>
+                Proyecto
+              </button>
+              @if (!isCollapsed('project')) {
+                <div class="panel__body">
+                  <p class="hint">{{ project.projectRoot() ?? 'Sin proyecto abierto.' }}</p>
+                  @if (!hasFileSystem) {
+                    <p class="hint hint--warn">
+                      Modo navegador: sin acceso a disco. Abri el editor con "npm run electron".
+                    </p>
+                  }
+                </div>
+              }
+            </section>
           }
         </div>
-      </section>
-    </aside>
+      </div>
+    </section>
   </div>
 
-  <!-- ===================== DOCK INFERIOR =====================
-       Dos pestanas: el editor de eventos y la consola de mensajes.
+  <!-- ===================== AREA INFERIOR =====================
+       Solo existe en las workspaces "eventos" y "salida"; en "layout" el
+       viewport se queda con todo el alto, que es lo que hace que cambiar de
+       workspace se sienta como en Blender.
 
        Los eventos son el corazon NoCode. Nada de esto esta escrito a mano: los
        <select> se llenan con lo que declara schema/event_catalog.json y los
@@ -452,141 +512,139 @@
        Los params de tipo entity_ref se muestran como desplegable de entidades
        del nivel (y no como texto libre) para que no se pueda escribir un id
        que no existe. -->
-  <section class="dock dock--bottom">
-    <div class="tabs">
-      <button class="tab" [class.is-active]="bottomPanel() === 'eventos'" (click)="bottomPanel.set('eventos')">
-        Eventos <span class="panel__count">{{ events().length }}</span>
-      </button>
-      <button class="tab" [class.is-active]="bottomPanel() === 'salida'" (click)="bottomPanel.set('salida')">
-        Salida
-      </button>
-      <div class="tabs__spacer"></div>
-      @if (bottomPanel() === 'eventos') {
-        <button class="btn btn--small" (click)="addEvent()">+ Evento</button>
-      }
-    </div>
+  @if (workspace() !== 'layout') {
+    <section class="area bottom">
+      <div class="area__head">
+        @if (workspace() === 'eventos') {
+          <span class="area__kind" title="Editor de eventos">⚡</span>
+          <span class="area__title">Eventos</span>
+          <span class="head__sep"></span>
+          <button class="tool" (click)="addEvent()">+ Evento</button>
+        } @else {
+          <span class="area__kind" title="Consola">›_</span>
+          <span class="area__title">Salida</span>
+        }
+        <div class="head__spacer"></div>
+        <span class="head__label">
+          {{ workspace() === 'eventos' ? events().length + ' eventos' : log().length + ' lineas' }}
+        </span>
+      </div>
 
-    <div class="dock__body">
-      @if (bottomPanel() === 'eventos') {
-        @for (event of events(); track $index; let eventIndex = $index) {
-          <article class="event">
-            <div class="event__row">
-              <span class="badge badge--trigger">Cuando</span>
-              <select
-                class="input"
-                [value]="event.trigger.type"
-                (change)="changeTrigger(eventIndex, str($event))"
-              >
-                @for (entry of triggers(); track entry.type) {
-                  <option [value]="entry.type">{{ entry.label }}</option>
-                }
-              </select>
-
-              @for (row of paramRows('triggers', event.trigger.type); track row.key) {
-                <label class="field field--inline">
-                  <span>{{ row.key }}</span>
-                  @if (row.def.type === 'entity_ref') {
-                    <select
-                      class="input"
-                      [value]="paramValue(event.trigger, row.key)"
-                      (change)="updateTriggerParam(eventIndex, row.key, str($event))"
-                    >
-                      <option value="" disabled>— entidad —</option>
-                      @for (id of entityIds(); track id) {
-                        <option [value]="id">{{ id }}</option>
-                      }
-                    </select>
-                  } @else {
-                    <input
-                      class="input"
-                      [type]="row.def.type === 'number' ? 'number' : 'text'"
-                      [value]="paramValue(event.trigger, row.key)"
-                      (change)="updateTriggerParam(eventIndex, row.key, str($event))"
-                    />
-                  }
-                </label>
-              }
-
-              <div class="event__spacer"></div>
-              <button class="btn btn--small btn--danger" (click)="removeEvent(eventIndex)">Quitar</button>
-            </div>
-
-            @for (action of event.actions; track $index; let actionIndex = $index) {
-              <div class="event__row event__row--child">
-                <span class="badge badge--action">Entonces</span>
-                <select
-                  class="input"
-                  [value]="action.type"
-                  (change)="changeAction(eventIndex, actionIndex, str($event))"
-                >
-                  @for (entry of actions(); track entry.type) {
+      <div class="area__body pad">
+        @if (workspace() === 'eventos') {
+          @for (event of events(); track $index; let eventIndex = $index) {
+            <article class="event">
+              <div class="event__row">
+                <span class="badge badge--trigger">Cuando</span>
+                <select class="select-lone" [value]="event.trigger.type"
+                        (change)="changeTrigger(eventIndex, str($event))">
+                  @for (entry of triggers(); track entry.type) {
                     <option [value]="entry.type">{{ entry.label }}</option>
                   }
                 </select>
 
-                @for (row of paramRows('actions', action.type); track row.key) {
+                @for (row of paramRows('triggers', event.trigger.type); track row.key) {
                   <label class="field field--inline">
                     <span>{{ row.key }}</span>
                     @if (row.def.type === 'entity_ref') {
-                      <select
-                        class="input"
-                        [value]="paramValue(action, row.key)"
-                        (change)="updateActionParam(eventIndex, actionIndex, row.key, str($event))"
-                      >
+                      <select class="select-lone" [value]="paramValue(event.trigger, row.key)"
+                              (change)="updateTriggerParam(eventIndex, row.key, str($event))">
                         <option value="" disabled>— entidad —</option>
                         @for (id of entityIds(); track id) {
                           <option [value]="id">{{ id }}</option>
                         }
                       </select>
                     } @else {
-                      <input
-                        class="input"
-                        [type]="row.def.type === 'number' ? 'number' : 'text'"
-                        [value]="paramValue(action, row.key)"
-                        (change)="updateActionParam(eventIndex, actionIndex, row.key, str($event))"
-                      />
+                      <input class="select-lone" [type]="row.def.type === 'number' ? 'number' : 'text'"
+                             [value]="paramValue(event.trigger, row.key)"
+                             (change)="updateTriggerParam(eventIndex, row.key, str($event))" />
                     }
                   </label>
                 }
 
                 <div class="event__spacer"></div>
-                <button class="btn btn--small" (click)="removeAction(eventIndex, actionIndex)">×</button>
+                <button class="btn btn--small btn--danger" (click)="removeEvent(eventIndex)">Quitar</button>
               </div>
-            }
 
-            <div class="event__row event__row--child">
-              <button class="btn btn--small" (click)="addAction(eventIndex)">+ Accion</button>
-            </div>
-          </article>
-        } @empty {
-          <p class="empty">
-            Sin eventos. El catalogo declara {{ triggers().length }} triggers,
-            {{ conditions().length }} condiciones y {{ actions().length }} acciones.
-          </p>
-        }
-      } @else {
-        <div class="console">
-          @for (line of log(); track $index) {
-            <div class="console__line">{{ line }}</div>
+              @for (action of event.actions; track $index; let actionIndex = $index) {
+                <div class="event__row event__row--child">
+                  <span class="badge badge--action">Entonces</span>
+                  <select class="select-lone" [value]="action.type"
+                          (change)="changeAction(eventIndex, actionIndex, str($event))">
+                    @for (entry of actions(); track entry.type) {
+                      <option [value]="entry.type">{{ entry.label }}</option>
+                    }
+                  </select>
+
+                  @for (row of paramRows('actions', action.type); track row.key) {
+                    <label class="field field--inline">
+                      <span>{{ row.key }}</span>
+                      @if (row.def.type === 'entity_ref') {
+                        <select class="select-lone" [value]="paramValue(action, row.key)"
+                                (change)="updateActionParam(eventIndex, actionIndex, row.key, str($event))">
+                          <option value="" disabled>— entidad —</option>
+                          @for (id of entityIds(); track id) {
+                            <option [value]="id">{{ id }}</option>
+                          }
+                        </select>
+                      } @else {
+                        <input class="select-lone" [type]="row.def.type === 'number' ? 'number' : 'text'"
+                               [value]="paramValue(action, row.key)"
+                               (change)="updateActionParam(eventIndex, actionIndex, row.key, str($event))" />
+                      }
+                    </label>
+                  }
+
+                  <div class="event__spacer"></div>
+                  <button class="btn btn--small" (click)="removeAction(eventIndex, actionIndex)">×</button>
+                </div>
+              }
+
+              <div class="event__row event__row--child">
+                <button class="btn btn--small" (click)="addAction(eventIndex)">+ Accion</button>
+              </div>
+            </article>
           } @empty {
-            <p class="empty">Sin mensajes todavia.</p>
+            <p class="empty">
+              Sin eventos. El catalogo declara {{ triggers().length }} triggers,
+              {{ conditions().length }} condiciones y {{ actions().length }} acciones.
+            </p>
           }
-        </div>
-      }
-    </div>
-  </section>
+        } @else {
+          <div class="console">
+            @for (line of log(); track $index) {
+              <div class="console__line">{{ line }}</div>
+            } @empty {
+              <p class="empty">Sin mensajes todavia.</p>
+            }
+          </div>
+        }
+      </div>
+    </section>
+  }
 
   <!-- ===================== BARRA DE ESTADO =====================
-       Ultimo mensaje del log y contador de entidades. El contador se pone en
-       amarillo al pasar ENTITY_WARN_THRESHOLD (app.ts): avisa antes de que la
-       escena empiece a comprometer los FPS del runtime. -->
+       Como la de Blender: pistas de raton y teclado a la izquierda, ultimo
+       mensaje en el medio, estadisticas de la escena a la derecha. El contador
+       de entidades se pone en ambar al pasar ENTITY_WARN_THRESHOLD (app.ts):
+       avisa antes de que la escena empiece a comprometer los FPS del runtime. -->
   <footer class="statusbar">
-    <span class="statusbar__msg">{{ status() }}</span>
+    <span class="keyhint"><b>Rueda</b> Zoom</span>
+    <span class="keyhint"><b>Derecho / Medio</b> Desplazar</span>
+    <span class="keyhint"><b>Inicio</b> Encuadrar</span>
+    <span class="keyhint"><b>Shift+D</b> Duplicar</span>
+    <span class="keyhint"><b>X</b> Eliminar</span>
+
     <div class="statusbar__spacer"></div>
-    <span class="pill" [class.pill--warn]="overBudget()">
-      {{ entities().length }} entidades
+
+    <span class="statusbar__msg">{{ status() }}</span>
+
+    <div class="statusbar__spacer"></div>
+
+    <span class="statusbar__stat" [class.statusbar__stat--warn]="overBudget()">
+      Entidades {{ entities().length }}
     </span>
-    <span class="pill">{{ events().length }} eventos</span>
-    <span class="pill">zoom {{ zoom() }}x</span>
+    <span class="statusbar__stat">Eventos {{ events().length }}</span>
+    <span class="statusbar__stat">{{ zoomLabel() }}</span>
   </footer>
 </div>
