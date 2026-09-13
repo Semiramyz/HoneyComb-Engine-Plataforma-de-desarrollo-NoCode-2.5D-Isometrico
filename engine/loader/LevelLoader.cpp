@@ -139,6 +139,10 @@ LoadedLevel LevelLoader::Load(const std::string& levelPath, EventSystem& eventSy
 
             entity.animationClip = entityJson.value("animation", std::string(""));
 
+            // Opcional y por defecto 0: los niveles escritos antes de que
+            // existiera este campo se siguen dibujando exactamente igual.
+            entity.groundOffset = entityJson.value("groundOffset", 0.0f);
+
             // Collider opcional. size {0,0} = la entidad no participa de la
             // deteccion; solid=false = participa (dispara on_collision) pero
             // no frena al jugador, o sea, funciona como sensor/trigger.

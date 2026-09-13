@@ -36,6 +36,17 @@ import {
 } from '@angular/core';
 
 import { GridCoord, IsoProjection } from './core/iso-projection';
+import {
+  SHAPES,
+  SHAPE_SHEET_DATA_URL,
+  SHAPE_SHEET_HEIGHT,
+  SHAPE_SHEET_WIDTH,
+  SHAPE_TEXTURE,
+  ShapeDef,
+  ShapeId,
+  shapeDef,
+  shapeOf,
+} from './core/iso-shapes';
 import { CatalogEntry, CatalogParamDef } from './models/event-catalog.model';
 import { EventStep, GridConfig, LevelEntity } from './models/level.model';
 import { CatalogService } from './services/catalog.service';
@@ -117,7 +128,9 @@ export class App {
   // --- Estado del proyecto abierto ------------------------------------------
   readonly levelFiles = signal<string[]>([]);
   readonly textures = signal<string[]>([]);
-  readonly status = signal('Listo. Abri una carpeta de proyecto para empezar.');
+  readonly status = signal('Listo. Abre una carpeta de proyecto, o crea un nivel y usa Guardar como.');
+  /** Ultima ruta usada al guardar por dialogo; se propone en el siguiente. */
+  readonly lastSavedPath = signal<string | null>(null);
   /** Hay cambios sin guardar. Lo enciende cualquier edicion; solo save() lo apaga. */
   readonly dirty = signal(false);
 
@@ -134,6 +147,12 @@ export class App {
   readonly tool = signal<Tool>('select');
   /** Textura elegida en el panel Recursos; es la que se coloca con la herramienta "place". */
   readonly activeTexture = signal<string | null>(null);
+  /**
+   * Primitiva elegida en el panel Figuras. Es EXCLUYENTE con activeTexture:
+   * elegir una apaga la otra, porque la herramienta "place" tiene que saber sin
+   * ambiguedad que esta a punto de colocar.
+   */
+  readonly activeShape = signal<ShapeId | null>(null);
   readonly zoom = signal(3);
   readonly showGrid = signal(true);
   readonly showColliders = signal(true);
@@ -153,8 +172,36 @@ export class App {
   private readonly collapsedPanels = signal<Record<string, boolean>>({});
 
   readonly zoomSteps = ZOOM_STEPS;
+  readonly shapes = SHAPES;
   /** Zoom en porcentaje para la barra de estado, como el de Blender. */
   readonly zoomLabel = computed(() => Math.round(this.zoom() * 100) + '%');
+
+  /**
+   * Estilo de una miniatura de la paleta: recorta la celda de la figura del
+   * sheet embebido y la escala a la mitad.
+   *
+   * Es un recorte del sheet real y no un icono aparte, para que la paleta no
+   * pueda mostrar una cosa y el viewport otra. La escala 0.5 es exacta (mitad
+   * justa de cada pixel), asi que con image-rendering: pixelated se ve nitida.
+   */
+  thumbStyle(shape: ShapeDef): Record<string, string> {
+    const scale = 0.5;
+    return {
+      'background-image': `url(${SHAPE_SHEET_DATA_URL})`,
+      'background-size': `${SHAPE_SHEET_WIDTH * scale}px ${SHAPE_SHEET_HEIGHT * scale}px`,
+      'background-position': `${-shape.sourceRect.x * scale}px ${-shape.sourceRect.y * scale}px`,
+      width: `${shape.sourceRect.width * scale}px`,
+      height: `${shape.sourceRect.height * scale}px`,
+    };
+  }
+
+  /**
+   * El sheet ya decodificado, listo para dibujar en el canvas. Es null hasta
+   * que la imagen termina de cargar (unos milisegundos: son datos embebidos,
+   * no una descarga), y por eso es un signal -- al resolverse dispara el
+   * effect() que redibuja, sin necesidad de un bucle de render.
+   */
+  private readonly shapeSheet = signal<HTMLImageElement | null>(null);
 
   private readonly viewport = viewChild<ElementRef<HTMLCanvasElement>>('viewport');
   /** Tamano real del canvas en pixeles. Lo mantiene al dia el ResizeObserver. */
@@ -212,6 +259,16 @@ export class App {
     // al pedo -- se dibuja cuando algo cambio, y nada mas.
     effect(() => this.draw());
 
+    // Decodifica el sheet de primitivas una sola vez. Al resolverse, el signal
+    // dispara el effect() de arriba y el viewport se redibuja ya con los
+    // sprites. La guarda de "typeof Image" es para los tests, que corren en
+    // jsdom sin decodificador de imagenes.
+    if (typeof Image !== 'undefined') {
+      const sheet = new Image();
+      sheet.onload = () => this.shapeSheet.set(sheet);
+      sheet.src = SHAPE_SHEET_DATA_URL;
+    }
+
     // El ResizeObserver sobrevive al componente si no se lo desconecta.
     this.destroyRef.onDestroy(() => this.observer?.disconnect());
   }
@@ -220,7 +277,7 @@ export class App {
 
   async openProject(): Promise<void> {
     if (!this.hasFileSystem) {
-      this.note('Sin acceso a disco. Abri el editor con "npm run electron".');
+      this.note('Sin acceso a disco. Abre el editor con "npm run electron".');
       return;
     }
     const opened = await this.project.openProjectFolder();
@@ -310,7 +367,7 @@ export class App {
     this.showNewLevelDialog.set(false);
     this.dirty.set(true);
     this.frameAll();
-    this.note('Nivel nuevo en memoria. Revisa la escena y guardalo.');
+    this.note('Nivel nuevo en memoria. Revisa la escena y usa Guardar.');
   }
 
   /**
@@ -358,11 +415,28 @@ export class App {
   }
 
   /** Guarda el nivel en levels/ y refresca el listado (puede ser uno nuevo). */
+  /**
+   * Guarda el nivel. Se comporta como el Guardar de cualquier programa: si ya
+   * se sabe donde va el archivo, lo escribe sin preguntar; si todavia no, abre
+   * el dialogo de Guardar como.
+   *
+   * Antes exigia tener una carpeta de proyecto abierta y, si no la habia, no
+   * hacia nada mas que avisar: no habia forma de guardar un nivel recien
+   * creado sin montar antes un proyecto entero.
+   */
   async save(): Promise<void> {
-    if (!this.hasFileSystem || !this.project.projectRoot()) {
-      this.note('Abri primero una carpeta de proyecto para poder guardar.');
+    if (!this.hasFileSystem) {
+      this.note('Sin acceso a disco. Abre el editor con "npm run electron".');
       return;
     }
+
+    // Sin proyecto abierto, o con un nivel que nunca se guardo, no hay ruta
+    // conocida: hay que preguntarla.
+    if (!this.project.projectRoot() || !this.levels.fileName()) {
+      await this.saveAs();
+      return;
+    }
+
     try {
       await this.levels.save();
       this.dirty.set(false);
@@ -371,6 +445,76 @@ export class App {
     } catch (error) {
       this.note('Error al guardar: ' + this.describe(error));
     }
+  }
+
+  /**
+   * Guardar como: abre el dialogo del sistema para elegir carpeta y nombre.
+   *
+   * Se puede usar sin proyecto abierto, que es el punto: un nivel suelto se
+   * guarda donde uno quiera, igual que un documento.
+   */
+  async saveAs(): Promise<void> {
+    if (!this.hasFileSystem) {
+      this.note('Sin acceso a disco. Abre el editor con "npm run electron".');
+      return;
+    }
+
+    // Se propone la ultima ruta usada; si no hay, el nombre del nivel.
+    const suggested = this.lastSavedPath() ?? this.levels.level().name + '.json';
+
+    try {
+      const path = await this.project.saveLevelAs(suggested, this.levels.level());
+      if (!path) {
+        return; // el usuario cancelo el dialogo
+      }
+      await this.afterSavedTo(path);
+    } catch (error) {
+      this.note('Error al guardar: ' + this.describe(error));
+    }
+  }
+
+  /**
+   * Deja el editor al dia despues de guardar por dialogo.
+   *
+   * Si el archivo cayo dentro de levels/ del proyecto abierto, se adopta como
+   * el nivel actual: aparece en el desplegable y los guardados siguientes ya no
+   * vuelven a preguntar. Si cayo fuera, se recuerda la ruta para proponerla la
+   * proxima vez, pero se sigue preguntando -- escribir fuera del proyecto sin
+   * dialogo requeriria abrirle al editor todo el disco, y no vale la pena.
+   */
+  private async afterSavedTo(path: string): Promise<void> {
+    this.dirty.set(false);
+    this.lastSavedPath.set(path);
+
+    const inLevels = this.levelsFolderFile(path);
+    if (inLevels) {
+      this.levels.fileName.set(inLevels);
+      this.levelFiles.set(await this.project.listLevels());
+    }
+    this.note('Guardado en ' + path);
+  }
+
+  /**
+   * Nombre del archivo si "path" esta justo dentro de levels/ del proyecto
+   * abierto; null en cualquier otro caso.
+   *
+   * Se compara en minusculas y con barras normales porque en Windows la misma
+   * carpeta llega escrita de varias formas (mayusculas distintas, / o \).
+   */
+  private levelsFolderFile(path: string): string | null {
+    const root = this.project.projectRoot();
+    if (!root) {
+      return null;
+    }
+    const normalize = (value: string) => value.replace(/\\/g, '/').toLowerCase();
+    const prefix = normalize(root).replace(/\/$/, '') + '/levels/';
+    const target = normalize(path);
+    if (!target.startsWith(prefix)) {
+      return null;
+    }
+    const rest = target.slice(prefix.length);
+    // Solo el nivel de arriba de levels/: una subcarpeta no la lista el editor.
+    return rest.includes('/') ? null : path.slice(path.length - rest.length);
   }
 
   // --- Interfaz: workspaces y paneles plegables -----------------------------
@@ -500,7 +644,8 @@ export class App {
 
     if (event.ctrlKey && event.key.toLowerCase() === 's') {
       event.preventDefault();
-      void this.save();
+      // Ctrl+Shift+S fuerza el dialogo aunque ya se sepa donde va el archivo.
+      void (event.shiftKey ? this.saveAs() : this.save());
       return;
     }
     if (event.key === 'Home') {
@@ -598,11 +743,27 @@ export class App {
   /** Elegir una textura pasa sola a la herramienta de colocar: es lo que se va a hacer. */
   selectTexture(name: string): void {
     this.activeTexture.set(name);
+    this.activeShape.set(null);
     this.tool.set('place');
   }
 
-  /** Crea una entidad nueva en la celda clickeada con la textura activa. */
-  private placeEntity(coord: GridCoord): void {
+  /** Idem con una primitiva del panel Figuras. */
+  selectShape(id: ShapeId): void {
+    this.activeShape.set(id);
+    this.activeTexture.set(null);
+    this.tool.set('place');
+  }
+
+  /**
+   * Crea una entidad nueva en la celda indicada. Si "shape" viene, la entidad
+   * es una primitiva de bloqueo; si no, se usa la textura activa.
+   *
+   * Las dos ramas producen una entidad IGUAL DE VALIDA para el motor: la figura
+   * viaja en el "type" (texto libre, uso del editor) y la textura sigue siendo
+   * obligatoria en las dos, porque el schema la exige. La diferencia es solo
+   * como la dibuja el canvas del editor.
+   */
+  private placeEntity(coord: GridCoord, shape: ShapeId | null = this.activeShape()): void {
     const grid = this.grid();
     const iso = new IsoProjection(grid.tileWidth, grid.tileHeight);
     if (!iso.isValidCoord(coord, grid.width, grid.height)) {
@@ -611,24 +772,83 @@ export class App {
     }
 
     const texture = this.activeTexture();
-    if (!texture) {
-      this.note('Elegi una textura en el panel Recursos antes de colocar.');
+    if (!shape && !texture) {
+      this.note('Elige una textura en Recursos o una primitiva en Figuras antes de colocar.');
       return;
     }
 
-    const entity: LevelEntity = {
-      id: this.nextEntityId('entidad'),
-      type: 'prop',
-      position: { col: coord.col, row: coord.row },
-      // Prefijo "textures/": las rutas del nivel son relativas a assets/, que
-      // es donde AssetResolver las busca del lado del motor.
-      texture: 'textures/' + texture,
-      sourceRect: { x: 0, y: 0, width: 16, height: 16 },
-    };
+    // Una primitiva NO es un caso especial del nivel: es una entidad como
+    // cualquier otra, apuntando a un recorte del spritesheet de figuras. Por
+    // eso el runtime la dibuja sin saber nada de "figuras", y por eso el JSON
+    // que sale de aca no tiene ni un campo inventado.
+    const def = shape ? shapeDef(shape) : undefined;
+
+    const entity: LevelEntity = def
+      ? {
+          id: this.nextEntityId(def.id),
+          type: def.id,
+          position: { col: coord.col, row: coord.row },
+          texture: SHAPE_TEXTURE,
+          sourceRect: { ...def.sourceRect },
+          // Sin esto el solido flota medio tile sobre su casilla: el motor
+          // apoya el borde inferior del sprite en el punto de la celda, y un
+          // solido tiene que apoyar ahi el centro del rombo de su base.
+          groundOffset: def.groundOffset,
+        }
+      : {
+          id: this.nextEntityId('entidad'),
+          type: 'prop',
+          position: { col: coord.col, row: coord.row },
+          // Prefijo "textures/": las rutas del nivel son relativas a assets/,
+          // que es donde AssetResolver las busca del lado del motor.
+          texture: 'textures/' + (texture ?? DEFAULT_STARTER_TEXTURE),
+          sourceRect: { x: 0, y: 0, width: 16, height: 16 },
+        };
+
     this.levels.addEntity(entity);
     // Queda seleccionada para poder ajustarla en el inspector sin buscarla.
     this.selectEntity(entity.id);
     this.dirty.set(true);
+  }
+
+  // --- Arrastrar una primitiva al viewport ----------------------------------
+  //
+  // Se usa el drag & drop nativo del navegador y no un arrastre a mano con
+  // pointer events: el nativo ya trae el fantasma del elemento pegado al
+  // cursor, el cursor de "copiar" y la cancelacion con Escape, que es
+  // exactamente lo que se espera de este gesto.
+
+  onShapeDragStart(event: DragEvent, id: ShapeId): void {
+    event.dataTransfer?.setData('text/honeycomb-shape', id);
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'copy';
+    }
+  }
+
+  /**
+   * Sin preventDefault() el canvas NO es un destino valido y el drop nunca
+   * llega. De paso se resalta la celda de destino, para poder apuntar.
+   */
+  onCanvasDragOver(event: DragEvent): void {
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'copy';
+    }
+    this.hovered.set(this.coordAt(event));
+  }
+
+  onCanvasDrop(event: DragEvent): void {
+    event.preventDefault();
+    const id = event.dataTransfer?.getData('text/honeycomb-shape');
+    // Puede caer aca cualquier cosa arrastrada desde fuera del editor.
+    if (!id || !shapeDef(id)) {
+      return;
+    }
+    this.placeEntity(this.coordAt(event), id as ShapeId);
+  }
+
+  onCanvasDragLeave(): void {
+    this.hovered.set(null);
   }
 
   /**
@@ -913,7 +1133,7 @@ export class App {
   }
 
   /** Celda de la grilla bajo el cursor. Puede quedar fuera de rango: quien llama valida. */
-  private coordAt(event: PointerEvent): GridCoord {
+  private coordAt(event: MouseEvent): GridCoord {
     const ref = this.viewport();
     const grid = this.grid();
     if (!ref) {
@@ -927,7 +1147,11 @@ export class App {
     const iso = new IsoProjection(grid.tileWidth, grid.tileHeight);
     return iso.screenToGrid({
       x: (event.clientX - rect.left - origin.x) / zoom,
-      y: (event.clientY - rect.top - origin.y) / zoom,
+      // El medio tile extra invierte el centrado del rombo: screenToGrid trata
+      // el punto de la celda como su esquina de arriba, y las celdas se dibujan
+      // centradas en el (ver diamond()). Sin esto, apuntar al medio de una
+      // casilla devolveria la de atras.
+      y: (event.clientY - rect.top - origin.y) / zoom + grid.tileHeight / 2,
     });
   }
 
@@ -956,17 +1180,45 @@ export class App {
       (a, b) => iso.gridToScreen(b.position).y - iso.gridToScreen(a.position).y,
     );
     for (const entity of ordered) {
-      const point = iso.gridToScreen(entity.position);
-      if (
-        x >= point.x &&
-        x <= point.x + entity.sourceRect.width &&
-        y >= point.y &&
-        y <= point.y + entity.sourceRect.height
-      ) {
+      // La misma caja que usa draw(), a zoom 1 (x e y ya vienen sin zoom). Si
+      // el hit-test calculara la suya por separado, clickear una entidad
+      // seleccionaria otra cosa en cuanto una de las dos formulas cambiara.
+      const box = this.spriteBox(entity, iso.gridToScreen(entity.position), 1);
+
+      if (x >= box.x && x <= box.x + box.w && y >= box.y && y <= box.y + box.h) {
         return entity.id;
       }
     }
     return null;
+  }
+
+  /**
+   * Donde cae el sprite de una entidad en pantalla. Es la traduccion EXACTA de
+   * lo que hace engine/main.cpp al encolar una entidad:
+   *
+   *     drawPosition = { ancla.x - ancho/2,  ancla.y - alto + groundOffset }
+   *
+   * Vive en un solo metodo, y no repetida en el dibujo y en el hit-test, para
+   * que no puedan divergir entre si -- ni de la formula del motor, que es la
+   * unica que manda: si el editor la calcula distinto, el nivel se ve de una
+   * forma al disenarlo y de otra al jugarlo.
+   *
+   * "anchor" ya viene en pixeles de canvas (proyectado y con zoom aplicado);
+   * el tamano y el offset se escalan aca.
+   */
+  private spriteBox(
+    entity: LevelEntity,
+    anchor: { x: number; y: number },
+    zoom: number,
+  ): { x: number; y: number; w: number; h: number } {
+    const w = entity.sourceRect.width * zoom;
+    const h = entity.sourceRect.height * zoom;
+    return {
+      x: anchor.x - w / 2,
+      y: anchor.y - h + (entity.groundOffset ?? 0) * zoom,
+      w,
+      h,
+    };
   }
 
   /**
@@ -1024,22 +1276,40 @@ export class App {
     const halfH = (grid.tileHeight / 2) * zoom;
     const fullH = grid.tileHeight * zoom;
 
-    /** Pasa una celda a pixeles del canvas (esquina superior del rombo). */
+    /** Pasa una celda a pixeles del canvas (su punto de apoyo, el del motor). */
     const project = (coord: GridCoord) => {
       const point = iso.gridToScreen(coord);
       return { x: origin.x + point.x * zoom, y: origin.y + point.y * zoom };
     };
 
+    /**
+     * Una ESQUINA de la grilla, para el contorno y las lineas de division.
+     *
+     * Como las celdas van centradas en su punto (ver diamond()), sus esquinas
+     * caen en col-0.5 / row-0.5, y proyectar eso da exactamente el mismo punto
+     * medio tile mas arriba. De ahi el "- halfH".
+     */
+    const gridPoint = (coord: GridCoord) => {
+      const point = project(coord);
+      return { x: point.x, y: point.y - halfH };
+    };
+
     // Traza el rombo de una celda (sin pintarlo): quien llama decide si lo
     // rellena, lo bordea o las dos cosas. Los cuatro puntos van desde la punta
     // superior, en sentido horario.
+    // El rombo va CENTRADO en el punto de la celda, no colgando de el. Es lo
+    // que hace el motor con el tile de piso (lo centra: ver el Submit del piso
+    // en main.cpp), y es lo que hace que una figura -- que apoya el centro de
+    // su base en ese punto -- se vea parada sobre su casilla y no medio tile
+    // por encima. Antes el editor lo dibujaba medio tile mas abajo que el
+    // juego.
     const diamond = (coord: GridCoord) => {
       const { x, y } = project(coord);
       ctx.beginPath();
-      ctx.moveTo(x, y);
-      ctx.lineTo(x + halfW, y + halfH);
-      ctx.lineTo(x, y + fullH);
-      ctx.lineTo(x - halfW, y + halfH);
+      ctx.moveTo(x, y - halfH);
+      ctx.lineTo(x + halfW, y);
+      ctx.lineTo(x, y + halfH);
+      ctx.lineTo(x - halfW, y);
       ctx.closePath();
     };
 
@@ -1054,7 +1324,7 @@ export class App {
         { col: 0, row: grid.height },
       ];
       corners.forEach((corner, index) => {
-        const { x, y } = project(corner);
+        const { x, y } = gridPoint(corner);
         if (index === 0) {
           ctx.moveTo(x, y);
         } else {
@@ -1073,14 +1343,14 @@ export class App {
       ctx.lineWidth = 1;
       ctx.beginPath();
       for (let col = 0; col <= grid.width; col += 1) {
-        const from = project({ col, row: 0 });
-        const to = project({ col, row: grid.height });
+        const from = gridPoint({ col, row: 0 });
+        const to = gridPoint({ col, row: grid.height });
         ctx.moveTo(from.x, from.y);
         ctx.lineTo(to.x, to.y);
       }
       for (let row = 0; row <= grid.height; row += 1) {
-        const from = project({ col: 0, row });
-        const to = project({ col: grid.width, row });
+        const from = gridPoint({ col: 0, row });
+        const to = gridPoint({ col: grid.width, row });
         ctx.moveTo(from.x, from.y);
         ctx.lineTo(to.x, to.y);
       }
@@ -1089,20 +1359,20 @@ export class App {
       // Los dos ejes que salen de la celda (0,0), con el color de Blender:
       // rojo el que hace crecer la columna, verde el que hace crecer la fila.
       // Van despues de la grilla para quedar por encima de ella.
-      const zero = project({ col: 0, row: 0 });
+      const zero = gridPoint({ col: 0, row: 0 });
       ctx.lineWidth = 1.5;
 
       ctx.strokeStyle = 'rgba(197, 79, 79, 0.85)';
       ctx.beginPath();
       ctx.moveTo(zero.x, zero.y);
-      const colEnd = project({ col: grid.width, row: 0 });
+      const colEnd = gridPoint({ col: grid.width, row: 0 });
       ctx.lineTo(colEnd.x, colEnd.y);
       ctx.stroke();
 
       ctx.strokeStyle = 'rgba(112, 158, 60, 0.85)';
       ctx.beginPath();
       ctx.moveTo(zero.x, zero.y);
-      const rowEnd = project({ col: 0, row: grid.height });
+      const rowEnd = gridPoint({ col: 0, row: grid.height });
       ctx.lineTo(rowEnd.x, rowEnd.y);
       ctx.stroke();
     }
@@ -1142,17 +1412,37 @@ export class App {
 
     for (const entity of ordered) {
       const { x, y } = project(entity.position);
-      const w = entity.sourceRect.width * zoom;
-      const h = entity.sourceRect.height * zoom;
       const isSelected = entity.id === selectedId;
 
-      ctx.fillStyle = this.entityColor(entity.type);
-      ctx.fillRect(x, y, w, h);
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+      // Una primitiva de bloqueo se dibuja como solido isometrico; el resto,
+      // Caja del sprite en pantalla, con la MISMA regla que main.cpp:
+      // centrado en X sobre el punto de la celda, borde inferior en ese punto,
+      // y groundOffset bajandolo. Antes el editor lo dibujaba con la esquina
+      // superior izquierda en el punto, que no es lo que hace el motor: una
+      // entidad se veia en un lugar en el editor y en otro en el juego.
+      const box = this.spriteBox(entity, { x, y }, zoom);
+
+      // Si es una primitiva del sheet se dibuja el sprite REAL; asi el editor
+      // muestra exactamente los pixeles que va a mostrar el juego. Lo demas
+      // sigue siendo un rectangulo de color, porque el editor todavia no carga
+      // las texturas del proyecto desde el disco.
+      const sheet = this.shapeSheet();
+      const def = shapeOf(entity);
+
+      if (def && sheet) {
+        const src = def.sourceRect;
+        ctx.drawImage(sheet, src.x, src.y, src.width, src.height, box.x, box.y, box.w, box.h);
+      } else {
+        ctx.fillStyle = this.entityColor(entity.type);
+        ctx.fillRect(box.x, box.y, box.w, box.h);
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(box.x + 0.5, box.y + 0.5, box.w - 1, box.h - 1);
+      }
 
       // Collider en verde punteado: se ve que es una caja logica y no arte.
+      // Va en el punto de la celda y no en la caja del sprite, porque es ahi
+      // donde lo encola el motor (ver el Submit a CollisionSystem en main.cpp).
       if (this.showColliders() && entity.collider) {
         ctx.setLineDash([3, 3]);
         ctx.strokeStyle = '#6b9e3f';
@@ -1166,10 +1456,10 @@ export class App {
       if (isSelected) {
         ctx.lineWidth = 3;
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-        ctx.strokeRect(x - 2, y - 2, w + 4, h + 4);
+        ctx.strokeRect(box.x - 2, box.y - 2, box.w + 4, box.h + 4);
         ctx.lineWidth = 1.5;
         ctx.strokeStyle = '#ff8b1f';
-        ctx.strokeRect(x - 2, y - 2, w + 4, h + 4);
+        ctx.strokeRect(box.x - 2, box.y - 2, box.w + 4, box.h + 4);
       }
 
       // Ancla real del runtime: la punta superior del rombo (origin {0,0}).
@@ -1181,7 +1471,7 @@ export class App {
       if (zoom >= 2) {
         ctx.font = '10px Inter, "Segoe UI", sans-serif';
         ctx.fillStyle = isSelected ? '#ffd0a0' : 'rgba(230, 230, 230, 0.6)';
-        ctx.fillText(entity.id, x, y - 6);
+        ctx.fillText(entity.id, box.x, box.y - 6);
       }
     }
 

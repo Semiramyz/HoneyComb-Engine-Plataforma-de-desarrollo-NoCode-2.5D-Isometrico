@@ -1,0 +1,90 @@
+{
+  "name": "prueba_figuras",
+  "grid": { "width": 8, "height": 8, "tileWidth": 64, "tileHeight": 32 },
+  "visuals": {
+    "floor": {
+      "texture": "textures/floor.png",
+      "sourceRect": { "x": 0, "y": 0, "width": 64, "height": 64 }
+    },
+    "wall": {
+      "texture": "textures/wall.png",
+      "sourceRect": { "x": 0, "y": 0, "width": 32, "height": 32 }
+    }
+  },
+  "entities": [
+    {
+      "id": "player_1",
+      "type": "player",
+      "position": { "col": 5, "row": 5 },
+      "texture": "textures/player.png",
+      "sourceRect": { "x": 0, "y": 0, "width": 16, "height": 16 },
+      "animation": "player_idle",
+      "collider": { "width": 16, "height": 16 }
+    },
+    {
+      "id": "cube_1",
+      "type": "cube",
+      "position": { "col": 1, "row": 1 },
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 0, "y": 0, "width": 64, "height": 96 },
+      "groundOffset": 17
+    },
+    {
+      "id": "pyramid_1",
+      "type": "pyramid",
+      "position": { "col": 3, "row": 1 },
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 66, "y": 0, "width": 64, "height": 96 },
+      "groundOffset": 17
+    },
+    {
+      "id": "ramp_1",
+      "type": "ramp",
+      "position": { "col": 5, "row": 1 },
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 132, "y": 0, "width": 64, "height": 96 },
+      "groundOffset": 17
+    },
+    {
+      "id": "slab_1",
+      "type": "slab",
+      "position": { "col": 1, "row": 3 },
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 198, "y": 0, "width": 64, "height": 96 },
+      "groundOffset": 17
+    },
+    {
+      "id": "cylinder_1",
+      "type": "cylinder",
+      "position": { "col": 3, "row": 3 },
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 0, "y": 98, "width": 64, "height": 96 },
+      "groundOffset": 17
+    },
+    {
+      "id": "cone_1",
+      "type": "cone",
+      "position": { "col": 5, "row": 3 },
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 66, "y": 98, "width": 64, "height": 96 },
+      "groundOffset": 17
+    },
+    {
+      "id": "sphere_1",
+      "type": "sphere",
+      "position": { "col": 1, "row": 5 },
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 132, "y": 98, "width": 64, "height": 96 },
+      "groundOffset": 17
+    },
+    {
+      "id": "pillar_1",
+      "type": "pillar",
+      "position": { "col": 3, "row": 5 },
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 198, "y": 98, "width": 64, "height": 96 },
+      "groundOffset": 17
+    }
+  ],
+  "events": []
+}

@@ -18,6 +18,11 @@ struct LevelEntity {
     const Texture2D* texture;
     Rectangle sourceRect;
     std::string animationClip;  // vacio si la entidad no se anima
+    // Pixeles que el sprite baja al dibujarse. 0 = el borde de abajo del
+    // sprite va en el punto de la celda (los "pies" de un personaje). Un
+    // solido que llena la casilla usa este campo para apoyar el centro del
+    // rombo de su base ahi, que es donde se centra el tile de piso.
+    float groundOffset = 0.0f;
     Vector2 colliderSize;        // {0,0} si la entidad no colisiona
     bool colliderSolid = false;  // true si el collider bloquea el movimiento
     bool destroyed = false;      // borrado suave: la accion destroy_entity solo marca esto

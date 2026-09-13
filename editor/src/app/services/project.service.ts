@@ -46,6 +46,22 @@ export class ProjectService {
     await window.honeycombProject.writeFile(`levels/${fileName}`, JSON.stringify(level, null, 2));
   }
 
+  /**
+   * Guarda abriendo el dialogo nativo del sistema, donde se elige carpeta y
+   * nombre: el "Guardar como" de cualquier programa de escritorio.
+   *
+   * A diferencia de saveLevel(), esto NO exige tener un proyecto abierto: el
+   * dialogo escribe en la ruta que elija la persona, sin pasar por la raiz del
+   * proyecto. Devuelve esa ruta, o null si se cancelo.
+   */
+  async saveLevelAs(suggestedPath: string, level: Level): Promise<string | null> {
+    const result = await window.honeycombProject.save(
+      suggestedPath,
+      JSON.stringify(level, null, 2),
+    );
+    return result.canceled || !result.filePath ? null : result.filePath;
+  }
+
   async readEventCatalog(): Promise<EventCatalog> {
     const contents = await window.honeycombProject.readFile('schema/event_catalog.json');
     return JSON.parse(contents) as EventCatalog;

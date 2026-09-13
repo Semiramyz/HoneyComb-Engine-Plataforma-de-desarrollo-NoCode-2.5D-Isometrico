@@ -234,10 +234,11 @@
   }
 }
 
-/* El outliner apila dos editores (escena y recursos) en la misma columna. */
+/* La columna izquierda apila tres editores. Solo el arbol de escena es
+   elastico; recursos y figuras ocupan lo que necesitan y se quedan abajo. */
 .stack {
   display: grid;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: 1fr auto auto;
   gap: 2px;
   min-height: 0;
 }
@@ -362,6 +363,65 @@
     background-size: 8px 8px;
     background-position: 0 0, 0 4px, 4px -4px, -4px 0;
     image-rendering: pixelated;
+  }
+
+  &__name {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 9px;
+  }
+}
+
+/* ---------- Paleta de figuras (primitivas de bloqueo) ---------- */
+/* Cuatro por fila fijas, no auto-fill como los recursos: son ocho y siempre
+   las mismas, asi que conviene una retícula estable que se aprenda de memoria
+   antes que una que se reacomode con el ancho del panel. */
+.shapes {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3px;
+  padding: 6px;
+}
+
+.shape {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 1px 4px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: var(--bg-panel);
+  color: var(--text-dim);
+  font: inherit;
+  /* "grab" anuncia que el gesto principal es arrastrar, no clickear. */
+  cursor: grab;
+
+  &:active {
+    cursor: grabbing;
+  }
+  &:hover {
+    background: #444;
+    color: var(--text);
+  }
+  &.is-active {
+    border-color: var(--accent-hi);
+    background: #3f4a5e;
+    color: var(--text-bright);
+  }
+
+  /* El tamano, el recorte y la escala los pone thumbStyle() en app.ts: son un
+     recorte del spritesheet real, no un icono aparte. Aca solo queda lo que no
+     depende de la figura. */
+  &__icon {
+    background-repeat: no-repeat;
+    /* Es pixel art: escalado sin interpolar o se ve pastoso. */
+    image-rendering: pixelated;
+    /* El fantasma que el navegador arrastra sale de este elemento; sin esto
+       arrastraria tambien el fondo del boton. */
+    pointer-events: none;
   }
 
   &__name {

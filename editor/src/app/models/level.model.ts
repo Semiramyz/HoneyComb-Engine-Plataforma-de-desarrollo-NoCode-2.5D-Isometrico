@@ -44,6 +44,14 @@ export interface LevelEntity {
   sourceRect: SourceRect;
   /** Nombre de clip registrado en AnimationSystem. Ausente si la entidad no se anima. */
   animation?: string;
+  /**
+   * Pixeles que el sprite baja al dibujarse. Ausente o 0 = el motor apoya el
+   * borde inferior del sprite en el punto de la celda (los "pies" de un
+   * personaje). Un solido que llena la casilla lo usa para apoyar ahi el
+   * centro del rombo de su base, medio tile mas abajo, que es donde el motor
+   * centra el tile de piso.
+   */
+  groundOffset?: number;
   /** Ausente si la entidad no colisiona. */
   collider?: ColliderConfig;
 }

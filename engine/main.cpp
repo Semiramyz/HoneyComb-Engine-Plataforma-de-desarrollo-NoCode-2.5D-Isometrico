@@ -481,9 +481,16 @@ int main(int argc, char *argv[])
 
             // El sprite se apoya en el suelo: centrado en X y con los "pies"
             // sobre el punto de la celda, por eso se resta el alto completo.
+            //
+            // groundOffset corrige eso para el arte que no se apoya en su
+            // borde inferior. Un personaje no lo declara (0) y queda igual que
+            // siempre; un solido que llena la casilla lo usa para bajar medio
+            // tile y apoyar el centro del rombo de su base en el punto de la
+            // celda, que es donde se centra el tile de piso. Sin esto un cubo
+            // flota medio tile sobre el suelo.
             Vector2 drawPosition{
                 sortPosition.x - sourceRect.width / 2.0f,
-                sortPosition.y - sourceRect.height};
+                sortPosition.y - sourceRect.height + entity.groundOffset};
             // Tinte de depuracion, mientras no haya arte propio por tipo.
             Color tint = entity.type == "obstacle" ? RED : WHITE;
 

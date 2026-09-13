@@ -29,10 +29,17 @@
       <span class="brand__name">HoneyComb</span>
     </div>
 
-    <button class="menu" (click)="openProject()">Archivo</button>
-    <button class="menu" (click)="newLevel()">Nuevo</button>
-    <button class="menu" (click)="save()">Guardar{{ dirty() ? ' *' : '' }}</button>
-    <button class="menu" (click)="frameAll()">Vista</button>
+    <button class="menu" (click)="openProject()" title="Abrir una carpeta de proyecto">
+      Archivo
+    </button>
+    <button class="menu" (click)="newLevel()" title="Crear un nivel nuevo">Nuevo</button>
+    <button class="menu" (click)="save()" title="Guardar (Ctrl+S)">
+      Guardar{{ dirty() ? ' *' : '' }}
+    </button>
+    <button class="menu" (click)="saveAs()" title="Elegir carpeta y nombre (Ctrl+Shift+S)">
+      Guardar como
+    </button>
+    <button class="menu" (click)="frameAll()" title="Encuadrar todo (Inicio)">Vista</button>
 
     <!-- Pestanas de workspace: no cambian de pantalla, cambian que editores
          estan abiertos (ver el tipo Workspace en app.ts). -->
@@ -111,9 +118,9 @@
           </label>
 
           @if (textures().length === 0) {
-            <p class="hint">Las plantillas usaran textures/player.png. Abre un proyecto antes de guardar el nivel.</p>
+            <p class="hint">Las plantillas usan textures/player.png. Abre un proyecto antes de guardar el nivel.</p>
           } @else {
-            <p class="hint">Usara {{ textures()[0] }} como textura inicial. Podras cambiarla desde Recursos.</p>
+            <p class="hint">Usa {{ textures()[0] }} como textura inicial. Puedes cambiarla desde Recursos.</p>
           }
         </div>
 
@@ -154,7 +161,7 @@
               <span class="tree__meta">{{ entity.position.col }},{{ entity.position.row }}</span>
             </button>
           } @empty {
-            <p class="empty">Sin entidades. Elegi una textura y usa la herramienta Colocar.</p>
+            <p class="empty">Sin entidades. Elige una textura y usa la herramienta Colocar.</p>
           }
         </div>
       </section>
@@ -176,6 +183,39 @@
             </button>
           } @empty {
             <p class="empty">assets/textures/ vacio o proyecto sin abrir.</p>
+          }
+        </div>
+      </section>
+
+      <!-- Primitivas de bloqueo. Se pueden arrastrar al viewport o clickear
+           para dejarlas como "lo que se va a colocar" con la herramienta de
+           colocar. Las miniaturas las genera app.ts con la misma funcion que
+           dibuja en el canvas (ver core/iso-shapes.ts). -->
+      <section class="area">
+        <div class="area__head">
+          <span class="area__kind" title="Primitivas">◆</span>
+          <span class="area__title">Figuras</span>
+          <div class="head__spacer"></div>
+          <span class="area__title">arrastra a la grilla</span>
+        </div>
+
+        <div class="area__body shapes">
+          @for (shape of shapes; track shape.id) {
+            <button
+              class="shape"
+              [class.is-active]="activeShape() === shape.id"
+              draggable="true"
+              [title]="shape.label + ' — arrastra al viewport, o haz clic para colocar'"
+              (dragstart)="onShapeDragStart($event, shape.id)"
+              (click)="selectShape(shape.id)"
+            >
+              <!-- La miniatura es un recorte del MISMO sheet que va al juego,
+                   escalado a la mitad: no hay un icono aparte que pueda quedar
+                   desincronizado del sprite real. Las cuentas estan en
+                   thumbStyle() porque son cuatro valores acoplados entre si. -->
+              <span class="shape__icon" [style]="thumbStyle(shape)"></span>
+              <span class="shape__name">{{ shape.label }}</span>
+            </button>
           }
         </div>
       </section>
@@ -240,6 +280,9 @@
           (pointerleave)="onPointerLeave()"
           (wheel)="onWheel($event)"
           (contextmenu)="onContextMenu($event)"
+          (dragover)="onCanvasDragOver($event)"
+          (dragleave)="onCanvasDragLeave()"
+          (drop)="onCanvasDrop($event)"
         ></canvas>
 
         <!-- Nivel y objeto activo arriba a la izquierda, como el texto de
@@ -256,7 +299,7 @@
             <span>{{ cell.col }}, {{ cell.row }}</span>
           }
           @if (tool() === 'place') {
-            <span>colocar · {{ activeTexture() ?? 'sin textura' }}</span>
+            <span>colocar · {{ activeShape() ?? activeTexture() ?? 'nada elegido' }}</span>
           }
         </div>
       </div>
@@ -487,7 +530,7 @@
                   <p class="hint">{{ project.projectRoot() ?? 'Sin proyecto abierto.' }}</p>
                   @if (!hasFileSystem) {
                     <p class="hint hint--warn">
-                      Modo navegador: sin acceso a disco. Abri el editor con "npm run electron".
+                      Modo navegador: sin acceso a disco. Abre el editor con "npm run electron".
                     </p>
                   }
                 </div>

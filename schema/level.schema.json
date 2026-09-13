@@ -71,6 +71,12 @@
             }
           },
           "animation": { "type": "string", "description": "Nombre de clip registrado en AnimationSystem. Opcional." },
+          "groundOffset": {
+            "type": "number",
+            "default": 0,
+            "description": "Pixeles que el sprite baja respecto de su posicion normal. Por defecto el motor apoya el BORDE INFERIOR del sprite en el punto de la celda, que es lo correcto para un personaje: sus pies quedan ahi. Pero un solido que llena la casilla (un cubo, una rampa) tiene que apoyar el CENTRO del rombo de su base en ese punto -- que es donde el motor centra el tile de piso -- y ese rombo se extiende medio tile mas abajo. Este campo es esa diferencia. 0 (o ausente) = el comportamiento de siempre.",
+            "$comment": "Sin este campo no hay forma de dibujar bien un sprite que llena la casilla: las paredes lo resuelven con un offset calculado a mano en main.cpp, que este campo permitiria reemplazar."
+          },
           "collider": {
             "type": "object",
             "description": "Caja de colision en pixeles. Opcional: si falta, la entidad no participa de la deteccion de contactos.",
