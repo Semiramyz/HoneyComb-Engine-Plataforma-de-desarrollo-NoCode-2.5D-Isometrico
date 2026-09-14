@@ -489,7 +489,13 @@ int main(int argc, char *argv[])
         }
         swingRemaining = std::max(0.0f, swingRemaining - deltaTime);
 
-        gfx.BeginFrame(RAYWHITE);
+        // Fondo elegido en el editor. El texto del HUD cambia a claro sobre un
+        // fondo oscuro, porque el gris oscuro de siempre ahi no se leeria.
+        const Color background = level.backgroundColor;
+        const bool darkBackground =
+            0.299f * background.r + 0.587f * background.g + 0.114f * background.b < 128.0f;
+        const Color hudText = darkBackground ? LIGHTGRAY : DARKGRAY;
+        gfx.BeginFrame(background);
 
         // --- Piso (SpriteLayer::Ground) --------------------------------------
         // Nada se dibuja directo: todo se ENCOLA en el ZSortSystem, que al final
@@ -718,15 +724,15 @@ int main(int argc, char *argv[])
         // --- HUD --------------------------------------------------------------
         if (player)
         {
-            gfx.DrawText(defaultFont, "Vida", {10, 10}, 20, DARKGRAY);
+            gfx.DrawText(defaultFont, "Vida", {10, 10}, 20, hudText);
             DrawHealthBar(60.0f, 13.0f, 160.0f, 14.0f, player->health / player->maxHealth,
                           Color{90, 200, 90, 255});
             const std::string lifeText = std::to_string(static_cast<int>(std::ceil(player->health))) +
                                          " / " + std::to_string(static_cast<int>(player->maxHealth));
-            gfx.DrawText(defaultFont, lifeText.c_str(), {230, 10}, 20, DARKGRAY);
+            gfx.DrawText(defaultFont, lifeText.c_str(), {230, 10}, 20, hudText);
         }
         gfx.DrawText(defaultFont, "Flechas/WASD mover  |  Espacio o J atacar",
-                     {10, static_cast<float>(gfx.GetScreenHeight() - 28)}, 18, DARKGRAY);
+                     {10, static_cast<float>(gfx.GetScreenHeight() - 28)}, 18, hudText);
 
         if (noticeRemaining > 0.0f)
         {

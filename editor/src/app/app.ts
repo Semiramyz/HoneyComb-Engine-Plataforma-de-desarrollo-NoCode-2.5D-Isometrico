@@ -34,6 +34,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { Hsv, clampChannel, hexToRgb, hsvToRgb, rgbToHex, rgbToHsv } from './core/color';
 
 import {
   CHARACTERS,
@@ -92,6 +93,7 @@ import {
   GridPosition,
   LevelEntity,
   MapRoom,
+  RgbColor,
   RoomSide,
 } from './models/level.model';
 import {
@@ -421,6 +423,10 @@ export class App {
    * ambiguedad que esta a punto de colocar.
    */
   readonly activeShape = signal<ShapeId | null>(null);
+  /** Panel Figuras: arrastrar con una figura elegida la coloca en cada casilla que pisa. */
+  readonly paintShapes = signal(false);
+  /** Trazo en curso de figuras pintadas arrastrando (ver startShapeStroke). */
+  private shapeStroke: { shape: ShapeId; start: GridCoord; last: GridCoord; placed: number } | null = null;
   /**
    * Id del personaje elegido en el panel Personajes: un tipo base
    * ("base-enemy") o uno configurado. Excluyente con los otros dos por el
@@ -431,6 +437,8 @@ export class App {
   readonly zoom = signal(3);
   readonly showGrid = signal(true);
   readonly showColliders = signal(true);
+  /** Lineas de la grilla por encima de las entidades (como F1 en el runtime) o debajo. */
+  readonly gridOnTop = signal(false);
   /** Desplazamiento de camara en pixeles de pantalla (boton medio o shift-arrastre). */
   readonly pan = signal({ x: 0, y: 0 });
   /** Celda bajo el cursor, para resaltarla. Null cuando el mouse sale del canvas. */
@@ -2651,6 +2659,12 @@ export class App {
     this.showGrid.update((value) => !value);
   }
 
+  /** Elegir donde van las lineas es querer verlas: con la grilla oculta, se muestra. */
+  setGridOnTop(onTop: boolean): void {
+    this.gridOnTop.set(onTop);
+    this.showGrid.set(true);
+  }
+
   toggleColliders(): void {
     this.showColliders.update((value) => !value);
   }
@@ -2710,7 +2724,10 @@ export class App {
     }
     if (activeTool === 'place') {
       const character = this.activeCharacter();
-      if (character) {
+      const shape = this.activeShape();
+      if (shape && (this.paintShapes() || event.shiftKey)) {
+        this.startShapeStroke(event, shape);
+      } else if (character) {
         this.placeCharacter(this.coordAt(event), character);
       } else {
         this.placeEntity(this.coordAt(event));
@@ -2736,6 +2753,10 @@ export class App {
       this.updateMove(event);
       return;
     }
+    if (this.shapeStroke) {
+      this.continueShapeStroke(event);
+      return;
+    }
     if (this.roomDrag()) {
       this.roomToolMove(event);
       return;
@@ -2753,6 +2774,10 @@ export class App {
   onPointerUp(event: PointerEvent): void {
     if (this.moveDrag) {
       this.finishMove(event);
+      return;
+    }
+    if (this.shapeStroke) {
+      this.finishShapeStroke(event);
       return;
     }
     if (this.roomDrag()) {
@@ -3375,20 +3400,7 @@ export class App {
     const def = shape ? shapeDef(shape) : undefined;
 
     const entity: LevelEntity = def
-      ? {
-          id: this.nextEntityId(def.id),
-          type: def.id,
-          position: { col: coord.col, row: coord.row },
-          texture: SHAPE_TEXTURE,
-          sourceRect: { ...def.sourceRect },
-          // Sin esto el solido flota medio tile sobre su casilla: el motor
-          // apoya el borde inferior del sprite en el punto de la celda, y un
-          // solido tiene que apoyar ahi el centro del rombo de su base.
-          groundOffset: def.groundOffset,
-          // La colision de SU forma, no una generica. Antes las figuras salian
-          // sin collider: se veian, pero el jugador las atravesaba.
-          collider: shapeCollider(def, grid),
-        }
+      ? this.shapeEntity(coord, def)
       : {
           id: this.nextEntityId('entidad'),
           type: 'prop',
@@ -3400,6 +3412,91 @@ export class App {
         };
 
     this.commitPlacement(entity);
+  }
+
+  private shapeEntity(coord: GridCoord, def: ShapeDef): LevelEntity {
+    return {
+      id: this.nextEntityId(def.id),
+      type: def.id,
+      position: { col: coord.col, row: coord.row },
+      texture: SHAPE_TEXTURE,
+      sourceRect: { ...def.sourceRect },
+      // Sin esto el solido flota medio tile sobre su casilla: el motor
+      // apoya el borde inferior del sprite en el punto de la celda, y un
+      // solido tiene que apoyar ahi el centro del rombo de su base.
+      groundOffset: def.groundOffset,
+      // La colision de SU forma, no una generica. Antes las figuras salian
+      // sin collider: se veian, pero el jugador las atravesaba.
+      collider: shapeCollider(def, this.grid()),
+    };
+  }
+
+  // --- Pintar figuras arrastrando --------------------------------------------
+  //
+  // Con "Pintar figuras arrastrando" (panel Figuras) o con Shift, mantener el
+  // clic y pasar por las casillas deja la figura elegida en cada una. Las
+  // casillas ocupadas se SALTAN sin preguntar: el dialogo de celda ocupada en
+  // medio de un trazo lo cortaria en cada casilla.
+
+  private startShapeStroke(event: PointerEvent, shape: ShapeId): void {
+    const cell = this.coordAt(event);
+    this.shapeStroke = { shape, start: cell, last: cell, placed: 0 };
+    // Con captura el trazo sigue aunque el cursor pase sobre un panel.
+    (event.target as HTMLElement).setPointerCapture(event.pointerId);
+    event.preventDefault();
+    this.paintShapeAt(cell);
+  }
+
+  private continueShapeStroke(event: PointerEvent): void {
+    const stroke = this.shapeStroke;
+    const cell = this.coordAt(event);
+    this.hovered.set(cell);
+    if (!stroke || (cell.col === stroke.last.col && cell.row === stroke.last.row)) {
+      return;
+    }
+    // Un movimiento rapido salta casillas entre dos eventos: se recorre la
+    // linea entera desde la ultima para no dejar huecos en el trazo.
+    const from = stroke.last;
+    const steps = Math.max(Math.abs(cell.col - from.col), Math.abs(cell.row - from.row));
+    for (let step = 1; step <= steps; step++) {
+      this.paintShapeAt({
+        col: Math.round(from.col + ((cell.col - from.col) * step) / steps),
+        row: Math.round(from.row + ((cell.row - from.row) * step) / steps),
+      });
+    }
+    stroke.last = cell;
+  }
+
+  private finishShapeStroke(event: PointerEvent): void {
+    const stroke = this.shapeStroke;
+    this.shapeStroke = null;
+    (event.target as HTMLElement).releasePointerCapture(event.pointerId);
+    if (!stroke) {
+      return;
+    }
+    const stayed = stroke.last.col === stroke.start.col && stroke.last.row === stroke.start.row;
+    if (stayed && stroke.placed === 0) {
+      // Un clic suelto sobre una casilla ocupada (o fuera de la grilla) no es
+      // un trazo: se resuelve como siempre, con el dialogo o el aviso.
+      this.placeEntity(stroke.start, stroke.shape);
+    } else if (stroke.placed > 1) {
+      this.note(stroke.placed + ' figuras colocadas.');
+    }
+  }
+
+  /** Coloca la figura del trazo si la casilla esta en la grilla y libre. */
+  private paintShapeAt(cell: GridCoord): void {
+    const def = this.shapeStroke ? shapeDef(this.shapeStroke.shape) : undefined;
+    const grid = this.grid();
+    if (!this.shapeStroke || !def || !new IsoProjection(grid.tileWidth, grid.tileHeight).isValidCoord(cell, grid.width, grid.height)) {
+      return;
+    }
+    const entity = this.shapeEntity(cell, def);
+    if (this.entities().some((other) => blocksOverlap(other, entity))) {
+      return;
+    }
+    this.addPlaced(entity);
+    this.shapeStroke.placed++;
   }
 
   // --- Celda ocupada --------------------------------------------------------
@@ -3804,6 +3901,101 @@ export class App {
     this.dirty.set(true);
   }
 
+  /** Fondo del runtime. Sin "backgroundColor" el motor usa RAYWHITE, asi que se muestra ese. */
+  backgroundColor(): RgbColor {
+    return this.levels.level().backgroundColor ?? { r: 245, g: 245, b: 245 };
+  }
+
+  backgroundHex(): string {
+    return rgbToHex(this.backgroundColor());
+  }
+
+  /**
+   * Ultimo HSV elegido en el selector. El RGB no alcanza para reconstruirlo:
+   * un gris no tiene tono y el negro tampoco saturacion, y sin guardarlo el
+   * cursor saltaria a una esquina al arrastrar por ahi.
+   */
+  private readonly backgroundPick = signal<Hsv | null>(null);
+
+  /**
+   * El color como lo dibuja el selector. Si el RGB cambio por otro lado (los
+   * campos, el hex, otro nivel), el HSV guardado ya no corresponde y se
+   * recalcula, conservando solo su tono para los grises.
+   */
+  backgroundHsv(): Hsv {
+    const rgb = this.backgroundColor();
+    const kept = this.backgroundPick();
+    if (kept && rgbToHex(hsvToRgb(kept)) === rgbToHex(rgb)) {
+      return kept;
+    }
+    return rgbToHsv(rgb, kept?.h ?? 0);
+  }
+
+  /** Color puro del tono actual: el fondo del cuadro de saturacion/brillo. */
+  backgroundHueCss(): string {
+    return `hsl(${this.backgroundHsv().h}, 100%, 50%)`;
+  }
+
+  /** Cuadro grande: X es la saturacion y Y el brillo (arriba = claro). */
+  onBackgroundSquare(event: PointerEvent): void {
+    const point = this.pickerPoint(event);
+    if (point) {
+      this.pickBackground({ ...this.backgroundHsv(), s: point.x, v: 1 - point.y });
+    }
+  }
+
+  /** Barra de tono: arriba 0°, abajo 360°. */
+  onBackgroundHue(event: PointerEvent): void {
+    const point = this.pickerPoint(event);
+    if (point) {
+      this.pickBackground({ ...this.backgroundHsv(), h: point.y * 360 });
+    }
+  }
+
+  setBackgroundHex(text: string): void {
+    const rgb = hexToRgb(text);
+    if (rgb) {
+      this.storeBackground(rgb);
+    }
+  }
+
+  patchBackground(changes: Partial<RgbColor>): void {
+    // El schema exige enteros de 0 a 255; el campo numerico deja escribir cualquier cosa.
+    const merged = { ...this.backgroundColor(), ...changes };
+    this.storeBackground({ r: clampChannel(merged.r), g: clampChannel(merged.g), b: clampChannel(merged.b) });
+  }
+
+  private pickBackground(hsv: Hsv): void {
+    this.backgroundPick.set(hsv);
+    this.storeBackground(hsvToRgb(hsv));
+  }
+
+  private storeBackground(backgroundColor: RgbColor): void {
+    this.levels.level.update((level) => ({ ...level, backgroundColor }));
+    this.dirty.set(true);
+  }
+
+  /**
+   * Posicion del puntero dentro del control, de 0 a 1 por eje; null si se
+   * mueve sin el boton apretado. Al apretar captura el puntero, asi el
+   * arrastre sigue aunque el mouse se salga del cuadro.
+   */
+  private pickerPoint(event: PointerEvent): { x: number; y: number } | null {
+    const target = event.currentTarget as HTMLElement;
+    if (event.type === 'pointerdown') {
+      target.setPointerCapture(event.pointerId);
+      event.preventDefault();
+    } else if ((event.buttons & 1) === 0) {
+      return null;
+    }
+    const box = target.getBoundingClientRect();
+    const unit = (value: number) => Math.min(1, Math.max(0, value));
+    return {
+      x: unit((event.clientX - box.left) / box.width),
+      y: unit((event.clientY - box.top) / box.height),
+    };
+  }
+
   /**
    * Primer id libre de la forma "base_N". Los ids tienen que ser unicos porque
    * los eventos referencian entidades por id (params de tipo entity_ref), y un
@@ -4154,6 +4346,28 @@ export class App {
       ctx.closePath();
     };
 
+    // Lineas de division. Se dibujan como dos familias de rectas completas y no
+    // rombo a rombo -- una linea por borde en vez de una por celda, sin trazos
+    // repetidos que se ven mas gruesos al superponerse.
+    const gridLines = (color: string) => {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (let col = 0; col <= grid.width; col += 1) {
+        const from = gridPoint({ col, row: 0 });
+        const to = gridPoint({ col, row: grid.height });
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(to.x, to.y);
+      }
+      for (let row = 0; row <= grid.height; row += 1) {
+        const from = gridPoint({ col: 0, row });
+        const to = gridPoint({ col: grid.width, row });
+        ctx.moveTo(from.x, from.y);
+        ctx.lineTo(to.x, to.y);
+      }
+      ctx.stroke();
+    };
+
     if (this.showGrid()) {
       // El suelo de la grilla es una sola forma plana, no un damero: Blender no
       // alterna el color de sus cuadros, y el damero competia con el arte.
@@ -4189,26 +4403,11 @@ export class App {
         }
       }
 
-      // Lineas de division: un pelo mas claras que el suelo, como las de
-      // Blender. Se dibujan como dos familias de rectas completas y no rombo a
-      // rombo -- una linea por borde en vez de una por celda, sin trazos
-      // repetidos que se ven mas gruesos al superponerse.
-      ctx.strokeStyle = '#4a4a4a';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      for (let col = 0; col <= grid.width; col += 1) {
-        const from = gridPoint({ col, row: 0 });
-        const to = gridPoint({ col, row: grid.height });
-        ctx.moveTo(from.x, from.y);
-        ctx.lineTo(to.x, to.y);
+      // Debajo: un pelo mas claras que el suelo, como las de Blender. Encima se
+      // dibujan despues de las entidades (ver el final de draw()).
+      if (!this.gridOnTop()) {
+        gridLines('#4a4a4a');
       }
-      for (let row = 0; row <= grid.height; row += 1) {
-        const from = gridPoint({ col: 0, row });
-        const to = gridPoint({ col: grid.width, row });
-        ctx.moveTo(from.x, from.y);
-        ctx.lineTo(to.x, to.y);
-      }
-      ctx.stroke();
 
       // Los dos ejes que salen de la celda (0,0), con el color de Blender:
       // rojo el que hace crecer la columna, verde el que hace crecer la fila.
@@ -4477,6 +4676,12 @@ export class App {
         ctx.fillStyle = isSelected ? '#ffd0a0' : 'rgba(230, 230, 230, 0.6)';
         ctx.fillText(entity.id, box.x, box.y - 6);
       }
+    }
+
+    // Encima: despues de las entidades y en el mismo rosa que la grilla de F1
+    // del runtime (main.cpp), que tambien va encima de todo.
+    if (this.showGrid() && this.gridOnTop()) {
+      gridLines('rgba(255, 105, 180, 0.86)');
     }
 
     this.drawAxisGizmo(ctx, size, iso, grid);

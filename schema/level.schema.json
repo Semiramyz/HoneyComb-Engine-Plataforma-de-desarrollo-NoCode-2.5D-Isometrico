@@ -6,6 +6,16 @@
   "required": ["name", "grid", "entities", "events"],
   "properties": {
     "name": { "type": "string", "description": "Nombre del nivel, para mostrar. No tiene por que coincidir con el del archivo." },
+    "backgroundColor": {
+      "type": "object",
+      "description": "Opcional. Color RGB con el que el runtime pinta el fondo de la escena. Si falta, se usa RAYWHITE (245, 245, 245).",
+      "required": ["r", "g", "b"],
+      "properties": {
+        "r": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "g": { "type": "integer", "minimum": 0, "maximum": 255 },
+        "b": { "type": "integer", "minimum": 0, "maximum": 255 }
+      }
+    },
     "grid": {
       "type": "object",
       "description": "Medidas del tablero isometrico: cuantas celdas tiene y cuanto mide cada tile en pixeles.",

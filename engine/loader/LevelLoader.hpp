@@ -57,6 +57,8 @@ struct LoadedLevel {
     Rectangle wallSourceRect;
     std::vector<GridCoord> floorTiles;
     std::vector<GridCoord> wallTiles;
+    // Fondo de la escena ("backgroundColor" en el JSON). RAYWHITE si falta.
+    Color backgroundColor = RAYWHITE;
 };
 
 // Orquestador de la Capa 3: lee un archivo de nivel (ver

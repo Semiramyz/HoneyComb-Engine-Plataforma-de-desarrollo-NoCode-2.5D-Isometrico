@@ -138,8 +138,17 @@ export interface EventDefinition {
   actions: EventStep[];
 }
 
+/** Color RGB, cada canal de 0 a 255. */
+export interface RgbColor {
+  r: number;
+  g: number;
+  b: number;
+}
+
 export interface Level {
   name: string;
+  /** Color con el que el runtime pinta el fondo de la escena. Ausente = RAYWHITE (245, 245, 245). */
+  backgroundColor?: RgbColor;
   grid: GridConfig;
   entities: LevelEntity[];
   events: EventDefinition[];

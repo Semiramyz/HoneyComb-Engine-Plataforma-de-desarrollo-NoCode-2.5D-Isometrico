@@ -1024,6 +1024,14 @@
           @if (selected(); as entity) {
             <span class="vp-info__active"> | {{ entity.id }}</span>
           }
+          <!-- Lineas de la grilla por encima de las entidades (como la de F1
+               en el runtime) o por debajo, que es como se ve el piso. -->
+          <div class="vp-gridpos" role="group" aria-label="Líneas de la grilla">
+            <button type="button" [class.is-active]="gridOnTop()" (click)="setGridOnTop(true)"
+                    title="Líneas de la grilla encima de las entidades">Encima</button>
+            <button type="button" [class.is-active]="!gridOnTop()" (click)="setGridOnTop(false)"
+                    title="Líneas de la grilla debajo de las entidades">Debajo</button>
+          </div>
         </div>
 
 
@@ -1284,6 +1292,24 @@
             } @else {
               <p class="empty">Sin objeto activo. Selecciona una entidad en la escena o en el viewport.</p>
             }
+
+            <!-- Fuera del @if de la seleccion: sirve para colocar, asi que
+                 tiene que estar aunque no haya nada elegido. -->
+            <section class="panel">
+              <button class="panel__head" (click)="togglePanel('shapes')">
+                <span class="panel__arrow" [class.panel__arrow--collapsed]="isCollapsed('shapes')">▶</span>
+                Figuras
+              </button>
+              @if (!isCollapsed('shapes')) {
+                <div class="panel__body">
+                  <label class="check">
+                    <input type="checkbox" [checked]="paintShapes()" (change)="paintShapes.set(checked($event))" />
+                    <span>Pintar figuras arrastrando</span>
+                  </label>
+                  <p class="hint">Shift + arrastrar pinta siempre.</p>
+                </div>
+              }
+            </section>
           } @else {
             <section class="panel">
               <button class="panel__head" (click)="togglePanel('level')">
@@ -1296,6 +1322,58 @@
                     <span>Nombre</span>
                     <input class="input" [value]="levels.level().name" (change)="renameLevel(str($event))" />
                   </label>
+                </div>
+              }
+            </section>
+
+            <section class="panel">
+              <button class="panel__head" (click)="togglePanel('background')">
+                <span class="panel__arrow" [class.panel__arrow--collapsed]="isCollapsed('background')">▶</span>
+                Fondo y colores
+              </button>
+              @if (!isCollapsed('background')) {
+                <div class="panel__body">
+                  <!-- Selector a lo Photoshop, sin ventana aparte: el cuadro
+                       elige saturacion (X) y brillo (Y), la barra el tono. -->
+                  <div class="picker">
+                    <div class="picker__square" [style.background-color]="backgroundHueCss()"
+                         (pointerdown)="onBackgroundSquare($event)" (pointermove)="onBackgroundSquare($event)">
+                      <span class="picker__cursor"
+                            [style.left.%]="backgroundHsv().s * 100"
+                            [style.top.%]="(1 - backgroundHsv().v) * 100"
+                            [style.background-color]="backgroundHex()"></span>
+                    </div>
+                    <div class="picker__hue"
+                         (pointerdown)="onBackgroundHue($event)" (pointermove)="onBackgroundHue($event)">
+                      <span class="picker__hue-cursor" [style.top.%]="backgroundHsv().h / 360 * 100"></span>
+                    </div>
+                  </div>
+                  <div class="picker__row">
+                    <span class="picker__swatch" [style.background-color]="backgroundHex()"></span>
+                    <label class="field">
+                      <span>Hex</span>
+                      <input class="input" maxlength="7" spellcheck="false" [value]="backgroundHex()"
+                             (change)="setBackgroundHex(str($event))" />
+                    </label>
+                  </div>
+                  <div class="field-row">
+                    <label class="field">
+                      <span>R</span>
+                      <input class="input" type="number" step="1" min="0" max="255" [value]="backgroundColor().r"
+                             (change)="patchBackground({ r: int($event) })" />
+                    </label>
+                    <label class="field">
+                      <span>G</span>
+                      <input class="input" type="number" step="1" min="0" max="255" [value]="backgroundColor().g"
+                             (change)="patchBackground({ g: int($event) })" />
+                    </label>
+                    <label class="field">
+                      <span>B</span>
+                      <input class="input" type="number" step="1" min="0" max="255" [value]="backgroundColor().b"
+                             (change)="patchBackground({ b: int($event) })" />
+                    </label>
+                  </div>
+                  <p class="hint">Color RGB del fondo de la escena al ejecutar el runtime.</p>
                 </div>
               }
             </section>

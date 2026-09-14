@@ -3,6 +3,8 @@
 #include <fstream>
 #include <stdexcept>
 
+#include <algorithm>
+
 #include "nlohmann/json.hpp"
 
 #include "loader/EventLoader.hpp"
@@ -45,6 +47,17 @@ LoadedLevel LevelLoader::Load(const std::string& levelPath, EventSystem& eventSy
         {},
         {}
     };
+
+    // --- Color de fondo ----------------------------------------------------
+    // Opcional: {r, g, b} de 0 a 255. Sin el bloque queda RAYWHITE, el fondo
+    // de siempre, asi que los niveles viejos se ven igual.
+    if (levelJson.contains("backgroundColor")) {
+        const auto& colorJson = levelJson.at("backgroundColor");
+        const auto channel = [&colorJson](const char* key) {
+            return static_cast<unsigned char>(std::clamp(colorJson.value(key, 245), 0, 255));
+        };
+        level.backgroundColor = Color{channel("r"), channel("g"), channel("b"), 255};
+    }
 
     // --- Visuales del nivel (piso y pared) ----------------------------------
     // Bloque opcional. Si falta, las texturas quedan en nullptr y main.cpp
