@@ -7,11 +7,20 @@ package "Proceso Electron renderer" as renderer {
   component "App\nAngular component" as app
   component "Canvas isometrico\nrender y entrada" as canvas
   component "Paneles y formularios" as panels
+  package "combat/" as combat {
+    component "ItemEditorController\nventana Objetos y armas" as itemEditor
+    component "CombatInspectorController\npanel Combate / Tienda" as combatInspector
+    component "PuzzleController\ndialogo Puzzle de sala" as puzzle
+    component "AttackPreviewDirective\nforma del ataque en canvas" as attackPreview
+  }
+  component "core/items.ts\ndefaults, validacion,\ncopia al nivel" as itemsCore
+  component "core/puzzles.ts\neventos de un puzzle" as puzzlesCore
   component "LevelService\nestado del nivel" as levelService
   component "CatalogService\ncatalogo de eventos" as catalogService
+  component "ItemLibraryService\nbiblioteca de objetos" as itemLibrary
   component "ProjectService\nfachada tipada" as projectService
   component "IsoProjection\nproyeccion de coordenadas" as projection
-  component "Modelos TypeScript\nLevel / EventCatalog" as models
+  component "Modelos TypeScript\nLevel / ItemDef / EventCatalog" as models
 }
 
 package "Proceso Electron main" as mainProcess {
@@ -23,16 +32,31 @@ component "preload.js\ncontextBridge" as preload
 folder "Proyecto en disco" as disk {
   file "levels/*.json" as levelFiles
   file "schema/event_catalog.json" as eventFile
+  file "items.json" as itemsFile
+  file "characters.json" as charactersFile
   folder "assets/textures" as textureFiles
 }
 
 app --> canvas
 app --> panels
+app --> itemEditor
+app --> combatInspector
+app --> puzzle
+panels --> attackPreview
 app --> levelService
 app --> catalogService
+itemEditor --> itemLibrary
+itemEditor --> itemsCore
+combatInspector --> levelService
+combatInspector --> itemLibrary
+puzzle --> puzzlesCore
+puzzle --> levelService
+attackPreview --> itemsCore
 canvas --> projection
 levelService --> models
+levelService --> itemsCore
 catalogService --> models
+itemLibrary --> projectService
 levelService --> projectService
 catalogService --> projectService
 projectService --> preload : honeycombProject API
@@ -45,5 +69,12 @@ Boundary de seguridad:
 contextIsolation=true
 nodeIntegration=false
 API minima expuesta al renderer.
+end note
+
+note bottom of combat
+Controladores y no componentes: el markup vive
+en app.html para usar los estilos de app.scss.
+Un objeto usado por el nivel se COPIA a "items"
+del nivel: el nivel no depende de items.json.
 end note
 @enduml

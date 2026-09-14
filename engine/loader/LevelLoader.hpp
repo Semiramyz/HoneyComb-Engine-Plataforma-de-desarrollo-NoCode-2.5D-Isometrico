@@ -7,6 +7,7 @@
 
 #include "core/ResourceManager.hpp"
 #include "loader/AssetResolver.hpp"
+#include "loader/ItemDefs.hpp"
 #include "systems/event_system/EventSystem.hpp"
 #include "systems/iso_grid/IsoGridSystem.hpp"
 
@@ -45,6 +46,24 @@ struct LevelEntity {
     Vector2 colliderSize;        // {0,0} si la entidad no colisiona
     bool colliderSolid = false;  // true si el collider bloquea el movimiento
     bool destroyed = false;      // borrado suave: la accion destroy_entity solo marca esto
+
+    // --- Combate, objetos y puzzles (ver loader/ItemDefs.hpp) ----------------
+    // Oculta pero no destruida: no se dibuja, no bloquea, no colisiona ni
+    // pelea. La cambian show_entity / hide_entity (las puertas de un puzzle).
+    bool hidden = false;
+    bool boss = false;
+    std::string itemId;    // objeto para juntar ("item" en el JSON)
+    std::string weaponId;  // arma de un enemigo ("weapon")
+    std::vector<DropEntry> drops;
+    InventoryConfig inventory;
+    DashConfig dash;
+    DefenseConfig defense;
+    std::vector<ShopEntry> shop;
+    // En ejecucion: donde arranco, para "Al limpiar una zona" (un enemigo que
+    // sale persiguiendo sigue contando para su sala), y el contador de la
+    // habilidad de su arma si es un enemigo armado.
+    Vector2 startPosition{0, 0};
+    ComboState combo;
 };
 
 struct LoadedLevel {
@@ -59,6 +78,10 @@ struct LoadedLevel {
     std::vector<GridCoord> wallTiles;
     // Fondo de la escena ("backgroundColor" en el JSON). RAYWHITE si falta.
     Color backgroundColor = RAYWHITE;
+    // Definiciones de objetos ("items") por id, y las zonas de los puzzles: las
+    // de "zones" mas una por cada sala de "rooms".
+    ItemCatalog items;
+    std::vector<Zone> zones;
 };
 
 // Orquestador de la Capa 3: lee un archivo de nivel (ver

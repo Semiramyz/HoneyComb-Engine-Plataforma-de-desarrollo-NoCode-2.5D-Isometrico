@@ -2,6 +2,14 @@
 // agregue aca tiene que agregarse tambien al schema y a LevelLoader.cpp (y
 // viceversa) -- este es el contrato compartido entre editor y runtime.
 
+import {
+  DropEntry,
+  InventoryConfig,
+  ItemDef,
+  MobilityConfig,
+  ShopConfig,
+} from './item.model';
+
 export interface GridConfig {
   width: number;
   height: number;
@@ -82,6 +90,25 @@ export interface LevelEntity {
   preset?: string;
   /** Ausente si la entidad no colisiona. */
   collider?: ColliderConfig;
+
+  // --- Combate, objetos y puzzles (ver models/item.model.ts) ---------------
+
+  /** Arranca oculta: no se ve, no bloquea ni pelea. show_entity / hide_entity la cambian (puertas). */
+  hidden?: boolean;
+  /** Objeto para juntar (type "item"): id en Level.items. */
+  item?: string;
+  /** Enemigo jefe: barra de vida grande y trigger "Al vencer al jefe". */
+  boss?: boolean;
+  /** Enemigo: id del arma con la que ataca. Ausente = pega por contacto. */
+  weapon?: string;
+  /** Enemigo: lo que puede soltar al caer. */
+  drops?: DropEntry[];
+  /** Jugador: inventario de armas y monedas. */
+  inventory?: InventoryConfig;
+  /** Jugador: esquive y defensa. */
+  mobility?: MobilityConfig;
+  /** NPC: lo que vende. */
+  shop?: ShopConfig;
 }
 
 export interface MapTile {
@@ -165,4 +192,20 @@ export interface Level {
    * encima de lo que generan las salas, para no perderse al moverlas.
    */
   tileEdits?: MapTile[];
+  /** Zonas de puzzle aparte de las salas. El motor tambien usa las salas como zonas. */
+  zones?: Zone[];
+  /**
+   * Objetos que usa el nivel, COPIADOS de la biblioteca del proyecto (items.json)
+   * al referenciarlos: el nivel se juega sin items.json.
+   */
+  items?: ItemDef[];
+}
+
+/** Rectangulo de celdas con nombre para los eventos de puzzle ("Al limpiar una zona"). */
+export interface Zone {
+  id: string;
+  col: number;
+  row: number;
+  width: number;
+  height: number;
 }

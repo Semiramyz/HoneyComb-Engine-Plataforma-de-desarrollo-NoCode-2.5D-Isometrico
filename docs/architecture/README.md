@@ -15,6 +15,7 @@ principales de HoneyComb Engine por separado.
 - `runtime-components.puml`: componentes internos del ejecutable C++.
 - `runtime-level-loading.puml`: carga de un nivel y resolucion de recursos.
 - `runtime-game-loop.puml`: ciclo principal de simulacion y renderizado.
+- `runtime-combat-frame.puml`: combate, objetos y puzzles dentro de un frame.
 - `runtime-deployment.puml`: ejecutable, DLLs y datos necesarios para ejecutar un proyecto.
 
 ## Relacion entre aplicaciones

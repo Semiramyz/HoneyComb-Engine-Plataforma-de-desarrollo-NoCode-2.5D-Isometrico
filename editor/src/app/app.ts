@@ -34,6 +34,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { Hsv, clampChannel, hexToRgb, hsvToRgb, rgbToHex, rgbToHsv } from './core/color';
 
 import {
@@ -50,6 +51,7 @@ import {
   presetFromArchetype,
   presetIdFromName,
 } from './core/characters';
+import { spriteCropStyle } from './core/sprite-style';
 import { CharacterPreset } from './models/character-preset.model';
 import { CharacterPresetService } from './services/character-preset.service';
 import { GridCoord, IsoProjection } from './core/iso-projection';
@@ -95,6 +97,7 @@ import {
   MapRoom,
   RgbColor,
   RoomSide,
+  Zone,
 } from './models/level.model';
 import {
   blockCenter,
@@ -102,7 +105,14 @@ import {
   clampBlockPosition,
   entitySpan,
 } from './core/entity-blocks';
+import { AttackPreviewDirective } from './combat/attack-preview.directive';
+import { CombatInspectorController } from './combat/combat-inspector.controller';
+import { ItemEditorController } from './combat/item-editor.controller';
+import { PuzzleController } from './combat/puzzle.controller';
+import { ITEM_KINDS, describeAttack, entityFromItem, itemKindDef } from './core/items';
+import { ItemDef, ItemKind, OnFullInventory } from './models/item.model';
 import { CatalogService } from './services/catalog.service';
+import { ItemLibraryService } from './services/item-library.service';
 import { LevelService } from './services/level.service';
 import { ProjectService } from './services/project.service';
 
@@ -110,6 +120,13 @@ import { ProjectService } from './services/project.service';
 type Tool = 'select' | 'place' | 'floor' | 'wall' | 'room' | 'tunnel';
 /** Las tres secciones de event_catalog.json, para acceder a ellas por nombre. */
 type CatalogKind = 'triggers' | 'conditions' | 'actions';
+/** Un paso de un evento, en singular: lo que edita cada fila del panel Eventos. */
+type StepKind = 'trigger' | 'condition' | 'action';
+const CATALOG_KIND: Record<StepKind, CatalogKind> = {
+  trigger: 'triggers',
+  condition: 'conditions',
+  action: 'actions',
+};
 /** Plantillas del dialogo "nivel nuevo": vacio, con jugador, o escena de prueba. */
 export type NewLevelTemplate = 'empty' | 'player' | 'test-scene';
 
@@ -234,30 +251,6 @@ const FALLBACK_SOURCE_RECT = { x: 0, y: 0, width: 16, height: 16 };
 const textureName = (path: string) => path.replace(/^textures\//, '');
 
 /**
- * Estilo CSS que muestra SOLO el recorte de un sprite, escalado para caber en
- * un cuadrado de "box" pixeles. Funciona con la imagen completa y tambien con
- * su miniatura reducida: el tamano del fondo se calcula con las medidas REALES
- * de la imagen, y el navegador estira la miniatura hasta que el recorte cae
- * donde tiene que caer.
- */
-function spriteCropStyle(
-  dataUrl: string,
-  imageWidth: number,
-  imageHeight: number,
-  rect: { x: number; y: number; width: number; height: number },
-  box: number,
-): Record<string, string> {
-  const zoom = box / Math.max(rect.width, rect.height, 1);
-  return {
-    'background-image': `url(${dataUrl})`,
-    'background-size': `${imageWidth * zoom}px ${imageHeight * zoom}px`,
-    'background-position': `${-rect.x * zoom}px ${-rect.y * zoom}px`,
-    width: `${rect.width * zoom}px`,
-    height: `${rect.height * zoom}px`,
-  };
-}
-
-/**
  * Que hace cada herramienta, para decirlo en la barra de estado al elegirla.
  * Varias no cambian nada en pantalla hasta el primer click en la grilla, y sin
  * este mensaje el boton se siente muerto aunque haya respondido.
@@ -362,7 +355,7 @@ interface ParamRow {
 
 @Component({
   selector: 'app-root',
-  imports: [MenuBar],
+  imports: [MenuBar, NgTemplateOutlet, AttackPreviewDirective],
   templateUrl: './app.html',
   styleUrl: './app.scss',
   // Los atajos se escuchan en window y no en el canvas: en Blender funcionan
@@ -375,6 +368,7 @@ export class App {
   readonly levels = inject(LevelService);
   readonly catalog = inject(CatalogService);
   readonly presetsService = inject(CharacterPresetService);
+  readonly itemLibrary = inject(ItemLibraryService);
   private readonly destroyRef = inject(DestroyRef);
 
   /** preload.js solo existe bajo Electron; con "ng serve" la UI corre sin acceso a disco. */
@@ -721,6 +715,40 @@ export class App {
         ],
       },
       {
+        id: 'combate',
+        label: 'Combate',
+        items: [
+          { kind: 'action', label: 'Objetos y armas…', run: () => this.itemEditor.open() },
+          separator,
+          {
+            kind: 'action',
+            label: 'Nueva arma cuerpo a cuerpo…',
+            run: () => this.itemEditor.open({ kind: 'weapon', category: 'melee' }),
+          },
+          {
+            kind: 'action',
+            label: 'Nueva arma a distancia…',
+            run: () => this.itemEditor.open({ kind: 'weapon', category: 'ranged' }),
+          },
+          { kind: 'action', label: 'Nueva curación…', run: () => this.itemEditor.open({ kind: 'healing' }) },
+          { kind: 'action', label: 'Nueva moneda…', run: () => this.itemEditor.open({ kind: 'coin' }) },
+          {
+            kind: 'submenu',
+            label: 'Editar un objeto guardado',
+            emptyLabel: 'Todavía no hay objetos en items.json',
+            items: this.itemLibrary.items().map((item) => ({
+              kind: 'action' as const,
+              label: this.itemGlyph(item) + '  ' + item.name,
+              run: () => this.itemEditor.open({ editId: item.id }),
+            })),
+          },
+          separator,
+          { kind: 'action', label: 'Puzzle de sala…', run: () => this.puzzle.open() },
+          { kind: 'action', label: 'Agregar zona de puzzle', run: () => this.addZone() },
+          { kind: 'action', label: 'Ver eventos del nivel', run: () => this.workspace.set('eventos') },
+        ],
+      },
+      {
         id: 'mapa',
         label: 'Mapa',
         items: [
@@ -879,6 +907,158 @@ export class App {
     // Se muestra el evento recien creado, que es donde se lo puede ajustar.
     this.workspace.set('eventos');
     this.note('Evento creado: al cumplirse, el juego pasa a ' + level + '.');
+  }
+
+  // --- Combate, objetos y puzzles ---------------------------------------------
+  //
+  // La logica vive en combat/ (un controlador por ventana o panel) y en
+  // core/items.ts y core/puzzles.ts; los controladores son campos de App para
+  // que su markup, en app.html, use los estilos de app.scss. Aca queda solo lo
+  // que toca al viewport, la paleta, las zonas y el panel de eventos.
+
+  readonly itemEditor = new ItemEditorController(
+    (message) => this.note(message),
+    () => this.dirty.set(true),
+  );
+  readonly combat = new CombatInspectorController(() => this.dirty.set(true));
+  readonly puzzle = new PuzzleController(
+    (message) => this.note(message),
+    () => this.dirty.set(true),
+    () => this.workspace.set('eventos'),
+  );
+  readonly itemKinds = ITEM_KINDS;
+
+  /** Objeto de la paleta Objetos elegido para colocar con clic. */
+  readonly activeItem = signal<string | null>(null);
+
+  readonly zones = computed(() => this.levels.level().zones ?? []);
+  /** Salas y zonas: lo que acepta un parametro zone_ref (el motor usa las dos). */
+  readonly zoneIds = computed(() => [...this.rooms().map((room) => room.id), ...this.zones().map((zone) => zone.id)]);
+
+  itemGlyph(item: ItemDef): string {
+    return itemKindDef(item.kind).glyph;
+  }
+
+  itemColor(item: ItemDef): string {
+    return itemKindDef(item.kind).color;
+  }
+
+  itemKindHint(kind: ItemKind): string {
+    return itemKindDef(kind).hint;
+  }
+
+  /** El dato corto de la paleta: dano de un arma, vida de una curacion, valor de una moneda. */
+  itemStat(item: ItemDef): string {
+    if (item.kind === 'weapon') {
+      return '⚔' + (item.weapon?.attack.damage ?? 0) + (item.weapon?.ability ? ' ★' : '');
+    }
+    return item.kind === 'healing' ? '✚' + (item.heal ?? 0) : '●' + (item.value ?? 1);
+  }
+
+  /** Resumen del arma de un enemigo, para el inspector. */
+  weaponSummary(id: string): string {
+    const weapon = this.combat.options().find((item) => item.id === id)?.weapon;
+    if (!weapon) {
+      return '';
+    }
+    const ability = weapon.ability ? ' · habilidad cada ' + weapon.ability.hitsRequired + ' golpes' : '';
+    return describeAttack(weapon.attack) + ability;
+  }
+
+  /** Miniatura del recorte de un objeto, sacada de la miniatura de Recursos. */
+  itemSpriteStyle(item: Pick<ItemDef, 'texture' | 'sourceRect'>, box = 22): Record<string, string> | null {
+    const asset = this.textureAssets()[textureName(item.texture)];
+    return asset && asset.width > 0
+      ? spriteCropStyle(asset.dataUrl, asset.width, asset.height, item.sourceRect, box)
+      : null;
+  }
+
+  /** En la ventana de objetos: elegir textura con sus medidas reales, para recortarla entera. */
+  setItemTexture(name: string): void {
+    this.itemEditor.setTexture(name, this.textureAssets()[name]);
+  }
+
+  /** El <select> devuelve texto: se valida antes de aceptarlo. */
+  onFullOf(value: string): OnFullInventory {
+    return value === 'auto_replace' || value === 'block' ? value : 'manual_replace';
+  }
+
+  /** Vuelve un <select> de "+ Agregar…" a su opcion vacia despues de usarlo. */
+  resetSelect(event: Event): void {
+    (event.target as HTMLSelectElement).value = '';
+  }
+
+  selectItem(id: string): void {
+    const item = this.itemLibrary.find(id);
+    if (!item) {
+      return;
+    }
+    this.activeItem.set(id);
+    this.activeCharacter.set(null);
+    this.activeShape.set(null);
+    this.activeTexture.set(null);
+    this.tool.set('place');
+    this.note(item.name + ': clic en la grilla para colocarlo. ' + itemKindDef(item.kind).hint);
+  }
+
+  activeItemLabel(): string | null {
+    const id = this.activeItem();
+    return id ? this.itemLibrary.find(id)?.name ?? id : null;
+  }
+
+  onItemDragStart(event: DragEvent, id: string): void {
+    event.dataTransfer?.setData('text/honeycomb-item', id);
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'copy';
+    }
+  }
+
+  /**
+   * Coloca un objeto para juntar. Su definicion se copia al nivel en el mismo
+   * paso: una entidad que referencia un objeto que el nivel no define no la
+   * junta nadie en el juego.
+   */
+  private placeItem(coord: GridCoord, id: string): void {
+    const item = this.itemLibrary.find(id);
+    const grid = this.grid();
+    if (!item || !new IsoProjection(grid.tileWidth, grid.tileHeight).isValidCoord(coord, grid.width, grid.height)) {
+      return;
+    }
+    this.levels.upsertItems([item]);
+    const entity = entityFromItem(item, coord, new Set(this.entityIds()));
+    if (this.commitPlacement(entity)) {
+      this.note(item.name + ' "' + entity.id + '" colocado. El jugador lo junta al tocarlo.');
+    }
+  }
+
+  /** Zona nueva de 4x4 donde esta la entidad activa, o en el centro de la grilla. */
+  addZone(): void {
+    const grid = this.grid();
+    const anchor = this.selected()?.position ?? {
+      col: Math.floor(grid.width / 2) - 2,
+      row: Math.floor(grid.height / 2) - 2,
+    };
+    const zone: Zone = {
+      id: nextFreeId('zona', this.zoneIds()),
+      col: Math.max(0, anchor.col),
+      row: Math.max(0, anchor.row),
+      width: 4,
+      height: 4,
+    };
+    this.levels.addZone(zone);
+    this.dirty.set(true);
+    this.showGridProperties();
+    this.note('Zona "' + zone.id + '" agregada. Ajustá su rectángulo en Escena > Zonas de puzzle.');
+  }
+
+  updateZone(id: string, changes: Partial<Omit<Zone, 'id'>>): void {
+    this.levels.updateZone(id, changes);
+    this.dirty.set(true);
+  }
+
+  removeZone(id: string): void {
+    this.levels.removeZone(id);
+    this.dirty.set(true);
   }
 
   // --- Personajes configurados ----------------------------------------------
@@ -1797,6 +1977,14 @@ export class App {
     } catch (error) {
       this.note('No se pudieron leer los personajes configurados: ' + this.describe(error));
     }
+
+    // Y la biblioteca de objetos, por lo mismo: sin ella se sigue editando, solo
+    // que la paleta Objetos queda vacia.
+    try {
+      await this.itemLibrary.load();
+    } catch (error) {
+      this.note('No se pudo leer items.json: ' + this.describe(error));
+    }
   }
 
   /**
@@ -2353,6 +2541,8 @@ export class App {
       !mainOpen && assetsOpen ? 'minmax(0, 1fr)' : 'auto',
       'auto',
       'auto',
+      // Objetos
+      'auto',
     ].join(' ');
   }
 
@@ -2724,11 +2914,14 @@ export class App {
     }
     if (activeTool === 'place') {
       const character = this.activeCharacter();
+      const item = this.activeItem();
       const shape = this.activeShape();
       if (shape && (this.paintShapes() || event.shiftKey)) {
         this.startShapeStroke(event, shape);
       } else if (character) {
         this.placeCharacter(this.coordAt(event), character);
+      } else if (item) {
+        this.placeItem(this.coordAt(event), item);
       } else {
         this.placeEntity(this.coordAt(event));
       }
@@ -3309,6 +3502,7 @@ export class App {
     this.activeTexture.set(name);
     this.activeShape.set(null);
     this.activeCharacter.set(null);
+    this.activeItem.set(null);
     this.tool.set('place');
   }
 
@@ -3317,6 +3511,7 @@ export class App {
     this.activeShape.set(id);
     this.activeTexture.set(null);
     this.activeCharacter.set(null);
+    this.activeItem.set(null);
     this.tool.set('place');
   }
 
@@ -3327,6 +3522,7 @@ export class App {
       return;
     }
     this.activeCharacter.set(presetId);
+    this.activeItem.set(null);
     this.activeShape.set(null);
     this.activeTexture.set(null);
     this.tool.set('place');
@@ -3652,6 +3848,12 @@ export class App {
     const characterId = event.dataTransfer?.getData('text/honeycomb-character');
     if (characterId && this.allPresets().some((preset) => preset.id === characterId)) {
       this.placeCharacter(this.coordAt(event), characterId);
+      return;
+    }
+
+    const itemId = event.dataTransfer?.getData('text/honeycomb-item');
+    if (itemId && this.itemLibrary.find(itemId)) {
+      this.placeItem(this.coordAt(event), itemId);
       return;
     }
 
@@ -4052,14 +4254,6 @@ export class App {
     this.dirty.set(true);
   }
 
-  updateTriggerParam(index: number, key: string, value: unknown): void {
-    const event = this.events()[index];
-    this.levels.updateEvent(index, {
-      trigger: { ...event.trigger, params: { ...event.trigger.params, [key]: value } },
-    });
-    this.dirty.set(true);
-  }
-
   addAction(index: number): void {
     const entry = this.actions()[0];
     if (!entry) {
@@ -4092,13 +4286,72 @@ export class App {
     this.dirty.set(true);
   }
 
-  updateActionParam(index: number, actionIndex: number, key: string, value: unknown): void {
+  /** Condiciones: el "si" del evento. Todas tienen que cumplirse (AND). */
+  addCondition(index: number): void {
+    const entry = this.conditions()[0];
+    if (!entry) {
+      this.note('El catalogo no declara ninguna condicion.');
+      return;
+    }
     const event = this.events()[index];
     this.levels.updateEvent(index, {
-      actions: event.actions.map((action, i) =>
-        i === actionIndex ? { ...action, params: { ...action.params, [key]: value } } : action,
+      conditions: [...(event.conditions ?? []), { type: entry.type, params: this.defaultParams(entry) }],
+    });
+    this.dirty.set(true);
+  }
+
+  removeCondition(index: number, conditionIndex: number): void {
+    const conditions = (this.events()[index].conditions ?? []).filter((_, i) => i !== conditionIndex);
+    // Sin condiciones la clave desaparece del JSON, como en los eventos que nunca las tuvieron.
+    this.levels.updateEvent(index, { conditions: conditions.length ? conditions : undefined });
+    this.dirty.set(true);
+  }
+
+  changeCondition(index: number, conditionIndex: number, type: string): void {
+    const entry = this.entryFor('conditions', type);
+    const event = this.events()[index];
+    this.levels.updateEvent(index, {
+      conditions: (event.conditions ?? []).map((condition, i) =>
+        i === conditionIndex ? { type, params: entry ? this.defaultParams(entry) : {} } : condition,
       ),
     });
+    this.dirty.set(true);
+  }
+
+  catalogKindOf(kind: StepKind): CatalogKind {
+    return CATALOG_KIND[kind];
+  }
+
+  /**
+   * Cambia un parametro de cualquier paso de un evento. El formulario entrega
+   * texto, y se guarda con el tipo que declara el catalogo: un number como
+   * numero (antes quedaba como texto y el motor lo tenia que adivinar), y un
+   * item_ref ademas copia la definicion del objeto al nivel.
+   */
+  updateStepParam(kind: StepKind, index: number, stepIndex: number, key: string, raw: string | boolean): void {
+    const event = this.events()[index];
+    const steps = kind === 'trigger' ? [event.trigger] : kind === 'condition' ? (event.conditions ?? []) : event.actions;
+    const step = steps[stepIndex];
+    if (!step) {
+      return;
+    }
+    const def = this.entryFor(CATALOG_KIND[kind], step.type)?.params[key];
+    let value: unknown = raw;
+    if (def?.type === 'number') {
+      const number = Number(raw);
+      value = Number.isFinite(number) ? number : 0;
+    } else if (def?.type === 'item_ref' && typeof raw === 'string' && raw) {
+      this.combat.use(raw);
+    }
+    const updated: EventStep = { ...step, params: { ...step.params, [key]: value } };
+    const replace = (list: EventStep[]) => list.map((current, i) => (i === stepIndex ? updated : current));
+    if (kind === 'trigger') {
+      this.levels.updateEvent(index, { trigger: updated });
+    } else if (kind === 'condition') {
+      this.levels.updateEvent(index, { conditions: replace(event.conditions ?? []) });
+    } else {
+      this.levels.updateEvent(index, { actions: replace(event.actions) });
+    }
     this.dirty.set(true);
   }
 
@@ -4475,6 +4728,36 @@ export class App {
       ctx.textAlign = 'left';
     }
 
+    // Zonas de puzzle: en ambar y con otro punteado, para no confundirlas con
+    // las grillas. Tampoco se ven en el juego; las leen los eventos.
+    for (const zone of level.zones ?? []) {
+      const corners = [
+        gridPoint({ col: zone.col, row: zone.row }),
+        gridPoint({ col: zone.col + zone.width, row: zone.row }),
+        gridPoint({ col: zone.col + zone.width, row: zone.row + zone.height }),
+        gridPoint({ col: zone.col, row: zone.row + zone.height }),
+      ];
+      ctx.beginPath();
+      ctx.moveTo(corners[0].x, corners[0].y);
+      for (const corner of corners.slice(1)) {
+        ctx.lineTo(corner.x, corner.y);
+      }
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(224, 160, 60, 0.07)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(224, 160, 60, 0.9)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([2, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.font = '600 11px Inter, "Segoe UI", sans-serif';
+      ctx.fillStyle = '#f0c07a';
+      ctx.textAlign = 'center';
+      ctx.fillText('◇ ' + zone.id, corners[0].x, corners[0].y + 32);
+      ctx.textAlign = 'left';
+    }
+
     // --- Vistas previas de las herramientas de mapa ------------------------
     // En verde y punteado: todavia no son parte del nivel. Muestran donde va a
     // quedar una grilla antes de confirmarla, y por donde va un tunel mientras
@@ -4590,6 +4873,9 @@ export class App {
       // muestra exactamente los pixeles que va a mostrar el juego. Lo demas
       // sigue siendo un rectangulo de color, porque el editor todavia no carga
       // las texturas del proyecto desde el disco.
+      // Oculta al empezar (una puerta de puzzle): se dibuja a medias, porque
+      // en el juego no se ve hasta que un evento la muestra.
+      ctx.globalAlpha = entity.hidden ? 0.4 : 1;
       const sheet = this.shapeSheet();
       const def = shapeOf(entity);
 
@@ -4602,6 +4888,22 @@ export class App {
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
         ctx.lineWidth = 1;
         ctx.strokeRect(box.x + 0.5, box.y + 0.5, box.w - 1, box.h - 1);
+      }
+      ctx.globalAlpha = 1;
+      if (entity.hidden) {
+        ctx.setLineDash([4, 3]);
+        ctx.strokeStyle = 'rgba(240, 192, 122, 0.9)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(box.x - 1, box.y - 1, box.w + 2, box.h + 2);
+        ctx.setLineDash([]);
+      }
+      // Corona sobre un jefe: es lo que en el juego tiene la barra de vida grande.
+      if (entity.boss) {
+        ctx.font = Math.max(11, 8 * zoom) + 'px sans-serif';
+        ctx.fillStyle = '#ffd66e';
+        ctx.textAlign = 'center';
+        ctx.fillText('♛', box.x + box.w / 2, box.y - 3);
+        ctx.textAlign = 'left';
       }
 
       // Collider: se ve que es una caja logica y no arte. Va en el punto de la

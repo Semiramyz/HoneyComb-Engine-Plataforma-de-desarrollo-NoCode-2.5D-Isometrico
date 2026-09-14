@@ -67,8 +67,9 @@ bool CanOccupy(const LoadedLevel& level, const LevelEntity& mover, Vector2 candi
 
     // Entidades solidas. Un collider con solid=false NO bloquea: funciona como
     // sensor, dispara on_collision y nada mas.
+    // Una entidad oculta (una puerta abierta) no bloquea: por eso existe.
     for (const auto& entity : level.entities) {
-        if (&entity == &mover || entity.destroyed || !entity.colliderSolid) {
+        if (&entity == &mover || entity.destroyed || entity.hidden || !entity.colliderSolid) {
             continue;
         }
         if (overlapsEntity(entity)) {
@@ -76,10 +77,56 @@ bool CanOccupy(const LoadedLevel& level, const LevelEntity& mover, Vector2 candi
         }
     }
 
-    if (blocker && blocker != &mover && !blocker->destroyed && overlapsEntity(*blocker)) {
+    if (blocker && blocker != &mover && !blocker->destroyed && !blocker->hidden &&
+        overlapsEntity(*blocker)) {
         return false;
     }
     return true;
+}
+
+bool TryMove(const LoadedLevel& level, LevelEntity& mover, Vector2 delta,
+             const LevelEntity* blocker) {
+    const Vector2 from = mover.precisePosition;
+    const Vector2 options[] = {
+        ClampToGrid(level, {from.x + delta.x, from.y + delta.y}),
+        ClampToGrid(level, {from.x + delta.x, from.y}),
+        ClampToGrid(level, {from.x, from.y + delta.y}),
+    };
+    for (const Vector2& candidate : options) {
+        if (CanOccupy(level, mover, candidate, blocker)) {
+            mover.precisePosition = candidate;
+            mover.position = GridCoord{static_cast<int>(std::round(candidate.x)),
+                                       static_cast<int>(std::round(candidate.y))};
+            return true;
+        }
+    }
+    return false;
+}
+
+bool BlocksProjectile(const LoadedLevel& level, Vector2 point, const LevelEntity* ignore) {
+    const int col = static_cast<int>(std::round(point.x));
+    const int row = static_cast<int>(std::round(point.y));
+    const auto sameCell = [col, row](const GridCoord& tile) {
+        return tile.col == col && tile.row == row;
+    };
+    if (std::none_of(level.floorTiles.begin(), level.floorTiles.end(), sameCell)) {
+        return true;
+    }
+    if (level.wallTexture &&
+        std::any_of(level.wallTiles.begin(), level.wallTiles.end(), sameCell)) {
+        return true;
+    }
+    for (const auto& entity : level.entities) {
+        if (&entity == ignore || entity.destroyed || entity.hidden || !entity.colliderSolid) {
+            continue;
+        }
+        const Vector2 half = HalfExtentsInCells(level, entity);
+        const Vector2 center = BoxCenter(entity);
+        if (std::fabs(point.x - center.x) < half.x && std::fabs(point.y - center.y) < half.y) {
+            return true;
+        }
+    }
+    return false;
 }
 
 }  // namespace Movement

@@ -1,0 +1,174 @@
+{
+  "items": [
+    {
+      "id": "espada",
+      "name": "Espada",
+      "kind": "weapon",
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 66, "y": 0, "width": 64, "height": 96 },
+      "scale": 0.35,
+      "weapon": {
+        "category": "melee",
+        "attack": { "pattern": "cone", "damage": 12, "cooldown": 0.4, "range": 1.6, "angle": 100 },
+        "ability": {
+          "name": "Giro cargado",
+          "hitsRequired": 3,
+          "activation": "auto",
+          "resetAfter": 3,
+          "attack": { "pattern": "area", "damage": 25, "cooldown": 0.6, "range": 2.2 }
+        }
+      }
+    },
+    {
+      "id": "lanza",
+      "name": "Lanza",
+      "kind": "weapon",
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 198, "y": 98, "width": 64, "height": 96 },
+      "scale": 0.4,
+      "weapon": {
+        "category": "melee",
+        "attack": { "pattern": "line", "damage": 14, "cooldown": 0.5, "range": 2.4, "width": 0.6 },
+        "ability": {
+          "name": "Estocada",
+          "hitsRequired": 4,
+          "activation": "manual",
+          "resetAfter": 0,
+          "attack": { "pattern": "line", "damage": 30, "cooldown": 0.6, "range": 4, "width": 1 }
+        }
+      }
+    },
+    {
+      "id": "martillo",
+      "name": "Martillo",
+      "kind": "weapon",
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 198, "y": 0, "width": 64, "height": 96 },
+      "scale": 0.35,
+      "weapon": {
+        "category": "melee",
+        "attack": { "pattern": "area", "damage": 18, "cooldown": 0.9, "range": 1.4 }
+      }
+    },
+    {
+      "id": "arco",
+      "name": "Arco",
+      "kind": "weapon",
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 132, "y": 0, "width": 64, "height": 96 },
+      "scale": 0.35,
+      "weapon": {
+        "category": "ranged",
+        "attack": { "pattern": "projectile", "damage": 9, "cooldown": 0.45, "range": 8, "speed": 10, "width": 0.35 },
+        "ability": {
+          "name": "Flecha perforante",
+          "hitsRequired": 3,
+          "activation": "auto",
+          "resetAfter": 0,
+          "attack": { "pattern": "projectile", "damage": 20, "cooldown": 0.5, "range": 10, "speed": 14, "width": 0.5, "pierce": true }
+        }
+      }
+    },
+    {
+      "id": "baston_fuego",
+      "name": "Bastón de fuego",
+      "kind": "weapon",
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 66, "y": 98, "width": 64, "height": 96 },
+      "scale": 0.35,
+      "weapon": {
+        "category": "ranged",
+        "attack": { "pattern": "explosive", "damage": 14, "cooldown": 1, "range": 6, "speed": 7, "width": 0.5, "radius": 1.6 },
+        "ability": {
+          "name": "Meteoro",
+          "hitsRequired": 3,
+          "activation": "manual",
+          "resetAfter": 0,
+          "attack": { "pattern": "remote_area", "damage": 35, "cooldown": 1, "range": 7, "radius": 2.2, "delay": 0.6 }
+        }
+      }
+    },
+    {
+      "id": "totem_curacion",
+      "name": "Tótem de curación",
+      "kind": "weapon",
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 0, "y": 98, "width": 64, "height": 96 },
+      "scale": 0.35,
+      "weapon": {
+        "category": "ranged",
+        "attack": { "pattern": "remote_area", "damage": 4, "cooldown": 2, "range": 5, "radius": 1.5, "delay": 0.4, "heal": 15 }
+      }
+    },
+    {
+      "id": "arco_goblin",
+      "name": "Arco de goblin",
+      "kind": "weapon",
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 132, "y": 0, "width": 64, "height": 96 },
+      "scale": 0.3,
+      "weapon": {
+        "category": "ranged",
+        "attack": { "pattern": "projectile", "damage": 6, "cooldown": 1.4, "range": 6, "speed": 6, "width": 0.35 }
+      }
+    },
+    {
+      "id": "garrote",
+      "name": "Garrote",
+      "kind": "weapon",
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 198, "y": 98, "width": 64, "height": 96 },
+      "scale": 0.35,
+      "weapon": {
+        "category": "melee",
+        "attack": { "pattern": "line", "damage": 8, "cooldown": 1, "range": 1.5, "width": 0.9 }
+      }
+    },
+    {
+      "id": "hacha_jefe",
+      "name": "Hacha del jefe",
+      "kind": "weapon",
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 66, "y": 0, "width": 64, "height": 96 },
+      "scale": 0.45,
+      "weapon": {
+        "category": "melee",
+        "attack": { "pattern": "cone", "damage": 14, "cooldown": 1.1, "range": 1.9, "angle": 140 },
+        "ability": {
+          "name": "Terremoto",
+          "hitsRequired": 2,
+          "activation": "auto",
+          "resetAfter": 0,
+          "attack": { "pattern": "area", "damage": 22, "cooldown": 1.5, "range": 2.6 }
+        }
+      }
+    },
+    {
+      "id": "pocion",
+      "name": "Poción",
+      "kind": "healing",
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 132, "y": 98, "width": 64, "height": 96 },
+      "scale": 0.3,
+      "heal": 30
+    },
+    {
+      "id": "moneda",
+      "name": "Moneda",
+      "kind": "coin",
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 0, "y": 98, "width": 64, "height": 96 },
+      "scale": 0.22,
+      "value": 1
+    },
+    {
+      "id": "bolsa_monedas",
+      "name": "Bolsa de monedas",
+      "kind": "coin",
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 0, "y": 0, "width": 64, "height": 96 },
+      "scale": 0.28,
+      "value": 5
+    }
+  ]
+}

@@ -52,8 +52,18 @@
     },
     "rooms": {
       "type": "array",
-      "description": "Solo del editor: las grillas (salas) que forman el mapa del nivel. El editor las traduce, junto con 'tunnels' y 'tileEdits', a 'tiles', que es lo unico que lee el motor; por eso LevelLoader.cpp no las lee. Si falta, el nivel es una sola grilla.",
+      "description": "Las grillas (salas) que forman el mapa del nivel. El editor las traduce, junto con 'tunnels' y 'tileEdits', a 'tiles', que es lo que el motor usa para caminar. El motor ademas las lee como ZONAS (ver 'zones'): una sala se puede usar en los eventos de puzzle ('Al limpiar una zona', 'Al entrar a una zona') por su id. Si falta, el nivel es una sola grilla.",
       "items": { "$ref": "#/definitions/mapRoom" }
+    },
+    "zones": {
+      "type": "array",
+      "description": "Opcional. Rectangulos de celdas con nombre para los puzzles, aparte de las salas: una parte de una sala, un pasillo. Los eventos los referencian por id (params de tipo zone_ref), igual que a las salas.",
+      "items": { "$ref": "#/definitions/zone" }
+    },
+    "items": {
+      "type": "array",
+      "description": "Definiciones de los objetos que usa el nivel: armas, curaciones y monedas. El editor las COPIA desde la biblioteca del proyecto (items.json) cuando algo del nivel las referencia -- un objeto colocado, el inventario del jugador, lo que suelta un enemigo, lo que vende un NPC --, asi que el nivel se puede jugar solo, sin items.json. Se referencian por id.",
+      "items": { "$ref": "#/definitions/itemDef" }
     },
     "tunnels": {
       "type": "array",
@@ -141,6 +151,56 @@
                 "type": "boolean",
                 "default": false,
                 "description": "Si es true, bloquea el movimiento; si es false, solo participa en deteccion de contactos."
+              }
+            }
+          },
+          "hidden": {
+            "type": "boolean",
+            "default": false,
+            "description": "La entidad arranca oculta: no se dibuja, no bloquea, no colisiona ni pelea. Las acciones show_entity / hide_entity la cambian en ejecucion. Es la pieza de las puertas de un puzzle: una pared oculta que aparece al entrar a la sala y se va al resolverla."
+          },
+          "item": {
+            "type": "string",
+            "description": "Objeto para juntar (type 'item'): id de una definicion de 'items'. El jugador lo junta al tocarlo, y la entidad queda destruida (dispara 'Al eliminar una entidad')."
+          },
+          "boss": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enemigo jefe: el motor muestra su barra de vida grande arriba de la pantalla, y cuenta para el trigger 'Al vencer al jefe'."
+          },
+          "weapon": {
+            "type": "string",
+            "description": "Enemigo: id del arma (en 'items') con la que ataca al jugador cuando lo tiene a su alcance. Sin arma, el enemigo pega por contacto con su stats.damage, como siempre."
+          },
+          "drops": {
+            "type": "array",
+            "description": "Enemigo: lo que puede soltar al caer. Cada entrada se sortea por separado, asi que puede soltar varias cosas o ninguna. Lo soltado queda en el piso para juntarlo.",
+            "items": {
+              "type": "object",
+              "required": ["item", "chance"],
+              "properties": {
+                "item": { "type": "string", "description": "id en 'items'." },
+                "chance": { "type": "number", "minimum": 0, "maximum": 1, "description": "Probabilidad de 0 a 1: 0.25 = una de cada cuatro veces." }
+              }
+            }
+          },
+          "inventory": { "$ref": "#/definitions/inventoryConfig" },
+          "mobility": { "$ref": "#/definitions/mobilityConfig" },
+          "shop": {
+            "type": "object",
+            "description": "NPC: lo que vende. En el juego, acercarse y apretar E abre la tienda; cada objeto se compra con su numero pagando con monedas.",
+            "required": ["items"],
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["item", "price"],
+                  "properties": {
+                    "item": { "type": "string", "description": "id en 'items'." },
+                    "price": { "type": "integer", "minimum": 0, "description": "Monedas que cuesta." }
+                  }
+                }
               }
             }
           }
@@ -241,6 +301,132 @@
         "row": { "type": "integer", "minimum": 0 },
         "floor": { "type": "boolean", "default": true },
         "wall": { "type": "boolean", "default": false }
+      }
+    },
+    "zone": {
+      "type": "object",
+      "description": "Un rectangulo de celdas con nombre, para los eventos de puzzle.",
+      "required": ["id", "col", "row", "width", "height"],
+      "properties": {
+        "id": { "type": "string" },
+        "col": { "type": "integer", "minimum": 0 },
+        "row": { "type": "integer", "minimum": 0 },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "itemDef": {
+      "type": "object",
+      "description": "Un objeto del juego. 'kind' dice que pasa al juntarlo: weapon va al inventario, healing cura en el acto, coin suma monedas.",
+      "required": ["id", "name", "kind", "texture", "sourceRect"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string", "description": "Nombre para mostrar en el HUD y en la tienda." },
+        "kind": { "type": "string", "enum": ["weapon", "healing", "coin"] },
+        "texture": { "type": "string", "description": "Ruta relativa a assets/: el sprite en el piso y en el inventario." },
+        "sourceRect": {
+          "type": "object",
+          "required": ["x", "y", "width", "height"],
+          "properties": {
+            "x": { "type": "number" },
+            "y": { "type": "number" },
+            "width": { "type": "number", "exclusiveMinimum": 0 },
+            "height": { "type": "number", "exclusiveMinimum": 0 }
+          }
+        },
+        "scale": { "type": "number", "exclusiveMinimum": 0, "default": 1 },
+        "weapon": { "$ref": "#/definitions/weaponDef", "description": "Solo kind weapon." },
+        "heal": { "type": "number", "minimum": 0, "description": "Solo kind healing: vida que devuelve, sin pasar de la vida inicial. Con la vida llena no se junta." },
+        "value": { "type": "integer", "minimum": 1, "default": 1, "description": "Solo kind coin: monedas que suma." }
+      }
+    },
+    "weaponDef": {
+      "type": "object",
+      "description": "Un arma: su ataque normal y, opcionalmente, una habilidad que se carga acertando golpes.",
+      "required": ["category", "attack"],
+      "properties": {
+        "category": { "type": "string", "enum": ["melee", "ranged"], "description": "Cuerpo a cuerpo o a distancia. Ordena el editor y la IA de los enemigos (uno a distancia no se acerca hasta tocarte)." },
+        "attack": { "$ref": "#/definitions/attackDef" },
+        "ability": { "$ref": "#/definitions/abilityDef" }
+      }
+    },
+    "attackDef": {
+      "type": "object",
+      "description": "Un ataque: la forma que golpea, cuanto saca y cada cuanto se repite. Las medidas van en CELDAS de grilla, desde el centro de quien ataca y hacia donde apunta: el mouse para el jugador, el jugador para un enemigo.",
+      "required": ["pattern", "damage", "cooldown", "range"],
+      "properties": {
+        "pattern": {
+          "type": "string",
+          "enum": ["line", "area", "cone", "projectile", "remote_area", "explosive"],
+          "description": "line = golpe lineal hacia donde apunta. area = todo alrededor de quien ataca. cone = sector de reloj de 'angle' grados hacia donde apunta. projectile = proyectil en linea recta que golpea al primero que toca. remote_area = efecto en el punto apuntado (hasta 'range' celdas) tras 'delay' segundos. explosive = proyectil que al chocar o llegar al final explota con radio 'radius'."
+        },
+        "damage": { "type": "number", "minimum": 0 },
+        "cooldown": { "type": "number", "minimum": 0, "description": "Segundos entre dos ataques." },
+        "range": { "type": "number", "exclusiveMinimum": 0, "description": "line y cone: largo del golpe. area: radio. projectile y explosive: distancia maxima que recorre. remote_area: distancia maxima a la que se puede apuntar." },
+        "width": { "type": "number", "exclusiveMinimum": 0, "default": 0.8, "description": "line: ancho del golpe. projectile y explosive: ancho del proyectil." },
+        "angle": { "type": "number", "exclusiveMinimum": 0, "maximum": 360, "default": 90, "description": "cone: apertura del sector, en grados." },
+        "radius": { "type": "number", "exclusiveMinimum": 0, "default": 1.5, "description": "remote_area y explosive: radio del area de efecto." },
+        "speed": { "type": "number", "exclusiveMinimum": 0, "default": 8, "description": "projectile y explosive: celdas por segundo." },
+        "delay": { "type": "number", "minimum": 0, "default": 0.4, "description": "remote_area: segundos entre lanzarlo y que caiga. Mientras tanto se ve marcado en el piso." },
+        "pierce": { "type": "boolean", "default": false, "description": "projectile: atraviesa a los que golpea en vez de frenarse en el primero." },
+        "heal": { "type": "number", "minimum": 0, "default": 0, "description": "Vida que recupera quien ataca si queda dentro del area del efecto (area, remote_area, explosive). Es lo que permite utilidades a distancia, como una zona de curacion con damage 0." }
+      }
+    },
+    "abilityDef": {
+      "type": "object",
+      "description": "Habilidad de un arma que se carga golpeando: cada ataque que acierta a alguien suma uno al contador, y al llegar a 'hitsRequired' queda lista.",
+      "required": ["hitsRequired", "attack"],
+      "properties": {
+        "name": { "type": "string", "description": "Nombre para el HUD." },
+        "hitsRequired": { "type": "integer", "minimum": 1, "default": 3 },
+        "activation": {
+          "type": "string",
+          "enum": ["auto", "manual"],
+          "default": "auto",
+          "description": "auto = el siguiente ataque sale como habilidad. manual = se lanza con la tecla de habilidad (Q) cuando esta lista."
+        },
+        "resetAfter": { "type": "number", "minimum": 0, "default": 0, "description": "Segundos sin acertar que devuelven el contador a cero. 0 = no se pierde. Una habilidad ya lista no se pierde." },
+        "attack": { "$ref": "#/definitions/attackDef" }
+      }
+    },
+    "inventoryConfig": {
+      "type": "object",
+      "description": "Jugador: el inventario de armas. En el juego cada arma va en un casillero que se elige con las teclas 1 a 9.",
+      "properties": {
+        "slots": { "type": "integer", "minimum": 1, "maximum": 9, "default": 3, "description": "Limite de armas." },
+        "locked": { "type": "boolean", "default": false, "description": "El limite queda fijo: la accion 'Cambiar tamaño del inventario' no lo modifica." },
+        "onFull": {
+          "type": "string",
+          "enum": ["auto_replace", "manual_replace", "block"],
+          "default": "manual_replace",
+          "description": "Que pasa al tocar un arma con el inventario lleno. auto_replace = la cambia sola por la del casillero activo. manual_replace = avisa y se cambia apretando E. block = no se puede juntar. El arma que se suelta queda en el piso para recuperarla."
+        },
+        "items": { "type": "array", "items": { "type": "string" }, "description": "Armas con las que arranca, por id en 'items'." },
+        "coins": { "type": "integer", "minimum": 0, "default": 0, "description": "Monedas con las que arranca." }
+      }
+    },
+    "mobilityConfig": {
+      "type": "object",
+      "description": "Jugador: esquive y defensa. Sin el bloque (o sin cada parte) esa accion no esta disponible.",
+      "properties": {
+        "dash": {
+          "type": "object",
+          "description": "Esquive rapido con Shift, hacia donde se camina (o hacia el mouse si esta quieto).",
+          "properties": {
+            "distance": { "type": "number", "exclusiveMinimum": 0, "default": 3, "description": "Celdas que recorre." },
+            "duration": { "type": "number", "exclusiveMinimum": 0, "default": 0.18, "description": "Segundos que dura." },
+            "cooldown": { "type": "number", "minimum": 0, "default": 0.8, "description": "Segundos hasta poder repetirlo." },
+            "iframes": { "type": "number", "minimum": 0, "default": 0.25, "description": "Segundos de invulnerabilidad desde que empieza (i-frames). 0 = se puede recibir dano durante el esquive." }
+          }
+        },
+        "defense": {
+          "type": "object",
+          "description": "Defensa mientras se mantiene el clic derecho o K: reduce el dano recibido, frena al jugador y no deja atacar.",
+          "properties": {
+            "reduction": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.5, "description": "Parte del dano que se evita: 0.5 = la mitad." },
+            "speedMultiplier": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.5, "description": "Velocidad mientras defiende: 0.5 = a la mitad." }
+          }
+        }
       }
     },
     "eventStep": {

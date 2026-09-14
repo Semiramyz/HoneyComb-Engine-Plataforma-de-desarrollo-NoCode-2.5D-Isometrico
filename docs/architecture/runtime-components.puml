@@ -12,6 +12,7 @@ package "Core" as core {
 
 package "Loaders" as loaders {
   component "LevelLoader\nJSON -> LoadedLevel" as levelLoader
+  component "ItemLoader\nobjetos, zonas y\nbloques de combate" as itemLoader
   component "EventLoader\nJSON -> eventos" as eventLoader
   component "AssetResolver\nrutas de assets" as assetResolver
 }
@@ -24,6 +25,16 @@ package "Systems" as systems {
   component "AnimationSystem\nclips e instancias" as animation
   component "AudioSystem\nsonido" as audio
   component "InputSystem\nacciones" as input
+}
+
+package "Game (reglas del juego)" as game {
+  component "Movement\npiso, paredes, solidos" as movement
+  component "Mobility\ncaminar, esquive, defensa" as mobility
+  component "Combat\nataques, proyectiles,\nhabilidades, IA" as combat
+  component "Inventory\narmas y monedas" as inventory
+  component "Loot\njuntar, botin, tienda" as loot
+  component "Zones\nzonas de puzzle" as zones
+  component "CombatView\nefectos y HUD" as combatView
 }
 
 database "Proyecto en disco" as disk
@@ -39,15 +50,30 @@ main --> collision
 main --> animation
 main --> audio
 main --> input
+main --> mobility
+main --> combat
+main --> loot
+main --> zones
+main --> combatView
+levelLoader --> itemLoader
 levelLoader --> eventLoader
 levelLoader --> assetResolver
 levelLoader --> resources
 levelLoader --> iso
+itemLoader --> resources
 eventLoader --> events
 assetResolver --> disk
 levelLoader --> disk
 levelLoader --> json
 events --> json
+mobility --> movement
+combat --> movement
+combat --> inventory
+loot --> inventory
+loot --> combat
+zones --> combat
+combatView --> zsort
+combatView --> graphics
 graphics --> raylib
 resources --> raylib
 zsort --> graphics
@@ -58,5 +84,11 @@ note right of graphics
 Los sistemas no deben llamar raylib
 directamente para renderizado;
 GraphicsDevice es el facade grafico.
+end note
+
+note bottom of game
+Capa 4: trabaja sobre el LoadedLevel ya cargado.
+Loaders arma los datos (loader/ItemDefs.hpp);
+game/ decide que pasa con ellos cada frame.
 end note
 @enduml

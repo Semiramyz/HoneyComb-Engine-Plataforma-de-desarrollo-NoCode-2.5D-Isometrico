@@ -1820,3 +1820,113 @@
     background-clip: content-box;
   }
 }
+
+/* ---------- Objetos y armas ---------- */
+/* Las seis formas de ataque como botones: las de cuerpo a cuerpo en gris, las
+   de distancia en gris azulado, para que la categoria se lea sin etiqueta. */
+.patterns {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  margin-bottom: 4px;
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    height: 28px;
+    padding: 0 8px;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    background: var(--widget);
+    color: var(--text);
+    font: inherit;
+    font-size: 11px;
+    cursor: pointer;
+
+    &:hover {
+      background: var(--widget-hover);
+    }
+    &.is-active {
+      border-color: var(--accent-hi);
+      background: var(--accent);
+      color: var(--text-bright);
+    }
+  }
+
+  &__item--ranged:not(.is-active) {
+    background: #4a5261;
+  }
+
+  &__glyph {
+    width: 14px;
+    text-align: center;
+  }
+}
+
+/* Formulario a la izquierda, vista previa a la derecha. */
+.attackform {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 10px;
+  align-items: start;
+
+  &__preview {
+    width: 260px;
+    height: 160px;
+    border: 1px solid var(--border-soft);
+    border-radius: var(--radius);
+  }
+}
+
+/* Los campos de un ataque van en grilla y no en una fila flex: son hasta
+   siete, y en una sola fila se comprimian hasta cortar etiquetas y valores. */
+.field-row--wrap {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 4px;
+
+  > .field {
+    min-width: 0;
+  }
+}
+
+/* Titulo chico dentro de un panel del inspector o de un dialogo. */
+.subhead {
+  margin: 10px 0 4px;
+  color: var(--text-dim);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Lista de casillas (las puertas de un puzzle), en columnas y con scroll. */
+.checklist {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 2px 10px;
+  max-height: 160px;
+  margin-bottom: 8px;
+  overflow: auto;
+
+  small {
+    margin-left: 4px;
+    color: var(--text-dim);
+  }
+}
+
+.maprow__select {
+  flex: 1;
+  min-width: 0;
+}
+
+.maprow__unit {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+/* "Si": la condicion va entre la causa (Cuando) y el efecto (Entonces). */
+.badge--condition {
+  background: #3d4a2a;
+  color: #b9d98a;
+}

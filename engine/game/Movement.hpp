@@ -35,4 +35,15 @@ Vector2 ClampToGrid(const LoadedLevel& level, Vector2 position);
 bool CanOccupy(const LoadedLevel& level, const LevelEntity& mover, Vector2 candidate,
                const LevelEntity* blocker = nullptr);
 
+// Mueve "delta" celdas si se puede. Prueba primero el movimiento completo y
+// despues cada eje por separado: contra una pared en diagonal, avanzar solo en
+// el eje libre hace que se deslice por ella en vez de quedarse clavado.
+// Devuelve false si no se pudo mover nada.
+bool TryMove(const LoadedLevel& level, LevelEntity& mover, Vector2 delta,
+             const LevelEntity* blocker = nullptr);
+
+// true si un proyectil en "point" choca contra el mapa: fuera del piso, en una
+// pared o dentro de una entidad solida (que no sea "ignore", quien lo tiro).
+bool BlocksProjectile(const LoadedLevel& level, Vector2 point, const LevelEntity* ignore);
+
 }  // namespace Movement

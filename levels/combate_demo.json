@@ -1,0 +1,1068 @@
+{
+  "name": "combate_demo",
+  "backgroundColor": {
+    "r": 34,
+    "g": 36,
+    "b": 44
+  },
+  "grid": {
+    "width": 20,
+    "height": 11,
+    "tileWidth": 64,
+    "tileHeight": 32
+  },
+  "visuals": {
+    "floor": {
+      "texture": "textures/floor.png",
+      "sourceRect": {
+        "x": 0,
+        "y": 0,
+        "width": 64,
+        "height": 64
+      }
+    },
+    "wall": {
+      "texture": "textures/wall.png",
+      "sourceRect": {
+        "x": 0,
+        "y": 0,
+        "width": 32,
+        "height": 32
+      }
+    }
+  },
+  "zones": [
+    {
+      "id": "arena",
+      "col": 1,
+      "row": 1,
+      "width": 9,
+      "height": 9
+    },
+    {
+      "id": "sala_jefe",
+      "col": 11,
+      "row": 1,
+      "width": 8,
+      "height": 9
+    }
+  ],
+  "items": [
+    {
+      "id": "espada",
+      "name": "Espada",
+      "kind": "weapon",
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 66,
+        "y": 0,
+        "width": 64,
+        "height": 96
+      },
+      "scale": 0.35,
+      "weapon": {
+        "category": "melee",
+        "attack": {
+          "pattern": "cone",
+          "damage": 12,
+          "cooldown": 0.4,
+          "range": 1.6,
+          "angle": 100
+        },
+        "ability": {
+          "name": "Giro cargado",
+          "hitsRequired": 3,
+          "activation": "auto",
+          "resetAfter": 3,
+          "attack": {
+            "pattern": "area",
+            "damage": 25,
+            "cooldown": 0.6,
+            "range": 2.2
+          }
+        }
+      }
+    },
+    {
+      "id": "lanza",
+      "name": "Lanza",
+      "kind": "weapon",
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 198,
+        "y": 98,
+        "width": 64,
+        "height": 96
+      },
+      "scale": 0.4,
+      "weapon": {
+        "category": "melee",
+        "attack": {
+          "pattern": "line",
+          "damage": 14,
+          "cooldown": 0.5,
+          "range": 2.4,
+          "width": 0.6
+        },
+        "ability": {
+          "name": "Estocada",
+          "hitsRequired": 4,
+          "activation": "manual",
+          "resetAfter": 0,
+          "attack": {
+            "pattern": "line",
+            "damage": 30,
+            "cooldown": 0.6,
+            "range": 4,
+            "width": 1
+          }
+        }
+      }
+    },
+    {
+      "id": "martillo",
+      "name": "Martillo",
+      "kind": "weapon",
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 198,
+        "y": 0,
+        "width": 64,
+        "height": 96
+      },
+      "scale": 0.35,
+      "weapon": {
+        "category": "melee",
+        "attack": {
+          "pattern": "area",
+          "damage": 18,
+          "cooldown": 0.9,
+          "range": 1.4
+        }
+      }
+    },
+    {
+      "id": "arco",
+      "name": "Arco",
+      "kind": "weapon",
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 132,
+        "y": 0,
+        "width": 64,
+        "height": 96
+      },
+      "scale": 0.35,
+      "weapon": {
+        "category": "ranged",
+        "attack": {
+          "pattern": "projectile",
+          "damage": 9,
+          "cooldown": 0.45,
+          "range": 8,
+          "speed": 10,
+          "width": 0.35
+        },
+        "ability": {
+          "name": "Flecha perforante",
+          "hitsRequired": 3,
+          "activation": "auto",
+          "resetAfter": 0,
+          "attack": {
+            "pattern": "projectile",
+            "damage": 20,
+            "cooldown": 0.5,
+            "range": 10,
+            "speed": 14,
+            "width": 0.5,
+            "pierce": true
+          }
+        }
+      }
+    },
+    {
+      "id": "baston_fuego",
+      "name": "Bastón de fuego",
+      "kind": "weapon",
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 66,
+        "y": 98,
+        "width": 64,
+        "height": 96
+      },
+      "scale": 0.35,
+      "weapon": {
+        "category": "ranged",
+        "attack": {
+          "pattern": "explosive",
+          "damage": 14,
+          "cooldown": 1,
+          "range": 6,
+          "speed": 7,
+          "width": 0.5,
+          "radius": 1.6
+        },
+        "ability": {
+          "name": "Meteoro",
+          "hitsRequired": 3,
+          "activation": "manual",
+          "resetAfter": 0,
+          "attack": {
+            "pattern": "remote_area",
+            "damage": 35,
+            "cooldown": 1,
+            "range": 7,
+            "radius": 2.2,
+            "delay": 0.6
+          }
+        }
+      }
+    },
+    {
+      "id": "totem_curacion",
+      "name": "Tótem de curación",
+      "kind": "weapon",
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 0,
+        "y": 98,
+        "width": 64,
+        "height": 96
+      },
+      "scale": 0.35,
+      "weapon": {
+        "category": "ranged",
+        "attack": {
+          "pattern": "remote_area",
+          "damage": 4,
+          "cooldown": 2,
+          "range": 5,
+          "radius": 1.5,
+          "delay": 0.4,
+          "heal": 15
+        }
+      }
+    },
+    {
+      "id": "arco_goblin",
+      "name": "Arco de goblin",
+      "kind": "weapon",
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 132,
+        "y": 0,
+        "width": 64,
+        "height": 96
+      },
+      "scale": 0.3,
+      "weapon": {
+        "category": "ranged",
+        "attack": {
+          "pattern": "projectile",
+          "damage": 6,
+          "cooldown": 1.4,
+          "range": 6,
+          "speed": 6,
+          "width": 0.35
+        }
+      }
+    },
+    {
+      "id": "garrote",
+      "name": "Garrote",
+      "kind": "weapon",
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 198,
+        "y": 98,
+        "width": 64,
+        "height": 96
+      },
+      "scale": 0.35,
+      "weapon": {
+        "category": "melee",
+        "attack": {
+          "pattern": "line",
+          "damage": 8,
+          "cooldown": 1,
+          "range": 1.5,
+          "width": 0.9
+        }
+      }
+    },
+    {
+      "id": "hacha_jefe",
+      "name": "Hacha del jefe",
+      "kind": "weapon",
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 66,
+        "y": 0,
+        "width": 64,
+        "height": 96
+      },
+      "scale": 0.45,
+      "weapon": {
+        "category": "melee",
+        "attack": {
+          "pattern": "cone",
+          "damage": 14,
+          "cooldown": 1.1,
+          "range": 1.9,
+          "angle": 140
+        },
+        "ability": {
+          "name": "Terremoto",
+          "hitsRequired": 2,
+          "activation": "auto",
+          "resetAfter": 0,
+          "attack": {
+            "pattern": "area",
+            "damage": 22,
+            "cooldown": 1.5,
+            "range": 2.6
+          }
+        }
+      }
+    },
+    {
+      "id": "pocion",
+      "name": "Poción",
+      "kind": "healing",
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 132,
+        "y": 98,
+        "width": 64,
+        "height": 96
+      },
+      "scale": 0.3,
+      "heal": 30
+    },
+    {
+      "id": "moneda",
+      "name": "Moneda",
+      "kind": "coin",
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 0,
+        "y": 98,
+        "width": 64,
+        "height": 96
+      },
+      "scale": 0.22,
+      "value": 1
+    },
+    {
+      "id": "bolsa_monedas",
+      "name": "Bolsa de monedas",
+      "kind": "coin",
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 0,
+        "y": 0,
+        "width": 64,
+        "height": 96
+      },
+      "scale": 0.28,
+      "value": 5
+    }
+  ],
+  "entities": [
+    {
+      "id": "player_1",
+      "type": "player",
+      "position": {
+        "col": 2,
+        "row": 5
+      },
+      "texture": "textures/player.png",
+      "sourceRect": {
+        "x": 0,
+        "y": 0,
+        "width": 16,
+        "height": 16
+      },
+      "scale": 2,
+      "collider": {
+        "width": 16,
+        "height": 16
+      },
+      "stats": {
+        "health": 100,
+        "damage": 10,
+        "speed": 3
+      },
+      "frames": 2,
+      "frameDuration": 0.4,
+      "inventory": {
+        "slots": 3,
+        "locked": false,
+        "onFull": "manual_replace",
+        "items": [
+          "espada"
+        ],
+        "coins": 3
+      },
+      "mobility": {
+        "dash": {
+          "distance": 3,
+          "duration": 0.18,
+          "cooldown": 0.8,
+          "iframes": 0.25
+        },
+        "defense": {
+          "reduction": 0.6,
+          "speedMultiplier": 0.5
+        }
+      }
+    },
+    {
+      "id": "tienda_1",
+      "type": "npc",
+      "position": {
+        "col": 2,
+        "row": 8
+      },
+      "texture": "textures/player.png",
+      "sourceRect": {
+        "x": 0,
+        "y": 0,
+        "width": 16,
+        "height": 16
+      },
+      "scale": 2,
+      "collider": {
+        "width": 16,
+        "height": 16
+      },
+      "stats": {
+        "health": 10,
+        "damage": 0,
+        "speed": 0
+      },
+      "shop": {
+        "items": [
+          {
+            "item": "pocion",
+            "price": 3
+          },
+          {
+            "item": "lanza",
+            "price": 5
+          },
+          {
+            "item": "arco",
+            "price": 6
+          },
+          {
+            "item": "baston_fuego",
+            "price": 10
+          }
+        ]
+      }
+    },
+    {
+      "id": "enemy_1",
+      "type": "enemy",
+      "position": {
+        "col": 6,
+        "row": 3
+      },
+      "texture": "textures/player2.png",
+      "sourceRect": {
+        "x": 0,
+        "y": 0,
+        "width": 16,
+        "height": 16
+      },
+      "scale": 2,
+      "collider": {
+        "width": 16,
+        "height": 16
+      },
+      "stats": {
+        "health": 30,
+        "damage": 8,
+        "speed": 1.5
+      },
+      "drops": [
+        {
+          "item": "moneda",
+          "chance": 0.9
+        },
+        {
+          "item": "pocion",
+          "chance": 0.25
+        }
+      ]
+    },
+    {
+      "id": "enemy_2",
+      "type": "enemy",
+      "position": {
+        "col": 8,
+        "row": 8
+      },
+      "texture": "textures/player2.png",
+      "sourceRect": {
+        "x": 0,
+        "y": 0,
+        "width": 16,
+        "height": 16
+      },
+      "scale": 2,
+      "collider": {
+        "width": 16,
+        "height": 16
+      },
+      "stats": {
+        "health": 25,
+        "damage": 6,
+        "speed": 1.2
+      },
+      "weapon": "arco_goblin",
+      "drops": [
+        {
+          "item": "bolsa_monedas",
+          "chance": 0.5
+        },
+        {
+          "item": "arco",
+          "chance": 0.35
+        }
+      ]
+    },
+    {
+      "id": "enemy_3",
+      "type": "enemy",
+      "position": {
+        "col": 8,
+        "row": 5
+      },
+      "texture": "textures/player2.png",
+      "sourceRect": {
+        "x": 0,
+        "y": 0,
+        "width": 16,
+        "height": 16
+      },
+      "scale": 2,
+      "collider": {
+        "width": 16,
+        "height": 16
+      },
+      "stats": {
+        "health": 35,
+        "damage": 8,
+        "speed": 1.4
+      },
+      "weapon": "garrote",
+      "drops": [
+        {
+          "item": "martillo",
+          "chance": 0.4
+        }
+      ]
+    },
+    {
+      "id": "moneda_1",
+      "type": "item",
+      "item": "moneda",
+      "position": {
+        "col": 4,
+        "row": 2
+      },
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 0,
+        "y": 98,
+        "width": 64,
+        "height": 96
+      },
+      "scale": 0.22,
+      "collider": {
+        "width": 16,
+        "height": 16
+      }
+    },
+    {
+      "id": "moneda_2",
+      "type": "item",
+      "item": "moneda",
+      "position": {
+        "col": 7,
+        "row": 2
+      },
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 0,
+        "y": 98,
+        "width": 64,
+        "height": 96
+      },
+      "scale": 0.22,
+      "collider": {
+        "width": 16,
+        "height": 16
+      }
+    },
+    {
+      "id": "moneda_3",
+      "type": "item",
+      "item": "moneda",
+      "position": {
+        "col": 4,
+        "row": 8
+      },
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 0,
+        "y": 98,
+        "width": 64,
+        "height": 96
+      },
+      "scale": 0.22,
+      "collider": {
+        "width": 16,
+        "height": 16
+      }
+    },
+    {
+      "id": "martillo_1",
+      "type": "item",
+      "item": "martillo",
+      "position": {
+        "col": 3,
+        "row": 3
+      },
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 198,
+        "y": 0,
+        "width": 64,
+        "height": 96
+      },
+      "scale": 0.35,
+      "collider": {
+        "width": 16,
+        "height": 16
+      }
+    },
+    {
+      "id": "pocion_1",
+      "type": "item",
+      "item": "pocion",
+      "position": {
+        "col": 13,
+        "row": 2
+      },
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 132,
+        "y": 98,
+        "width": 64,
+        "height": 96
+      },
+      "scale": 0.3,
+      "collider": {
+        "width": 16,
+        "height": 16
+      }
+    },
+    {
+      "id": "puerta_1",
+      "type": "cube",
+      "position": {
+        "col": 10,
+        "row": 1
+      },
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 0,
+        "y": 0,
+        "width": 64,
+        "height": 96
+      },
+      "groundOffset": 17,
+      "collider": {
+        "width": 64,
+        "height": 32,
+        "solid": true
+      }
+    },
+    {
+      "id": "puerta_2",
+      "type": "cube",
+      "position": {
+        "col": 10,
+        "row": 2
+      },
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 0,
+        "y": 0,
+        "width": 64,
+        "height": 96
+      },
+      "groundOffset": 17,
+      "collider": {
+        "width": 64,
+        "height": 32,
+        "solid": true
+      }
+    },
+    {
+      "id": "puerta_3",
+      "type": "cube",
+      "position": {
+        "col": 10,
+        "row": 3
+      },
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 0,
+        "y": 0,
+        "width": 64,
+        "height": 96
+      },
+      "groundOffset": 17,
+      "collider": {
+        "width": 64,
+        "height": 32,
+        "solid": true
+      }
+    },
+    {
+      "id": "puerta_4",
+      "type": "cube",
+      "position": {
+        "col": 10,
+        "row": 4
+      },
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 0,
+        "y": 0,
+        "width": 64,
+        "height": 96
+      },
+      "groundOffset": 17,
+      "collider": {
+        "width": 64,
+        "height": 32,
+        "solid": true
+      }
+    },
+    {
+      "id": "puerta_5",
+      "type": "cube",
+      "position": {
+        "col": 10,
+        "row": 5
+      },
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 0,
+        "y": 0,
+        "width": 64,
+        "height": 96
+      },
+      "groundOffset": 17,
+      "collider": {
+        "width": 64,
+        "height": 32,
+        "solid": true
+      }
+    },
+    {
+      "id": "puerta_6",
+      "type": "cube",
+      "position": {
+        "col": 10,
+        "row": 6
+      },
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 0,
+        "y": 0,
+        "width": 64,
+        "height": 96
+      },
+      "groundOffset": 17,
+      "collider": {
+        "width": 64,
+        "height": 32,
+        "solid": true
+      }
+    },
+    {
+      "id": "puerta_7",
+      "type": "cube",
+      "position": {
+        "col": 10,
+        "row": 7
+      },
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 0,
+        "y": 0,
+        "width": 64,
+        "height": 96
+      },
+      "groundOffset": 17,
+      "collider": {
+        "width": 64,
+        "height": 32,
+        "solid": true
+      }
+    },
+    {
+      "id": "puerta_8",
+      "type": "cube",
+      "position": {
+        "col": 10,
+        "row": 8
+      },
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 0,
+        "y": 0,
+        "width": 64,
+        "height": 96
+      },
+      "groundOffset": 17,
+      "collider": {
+        "width": 64,
+        "height": 32,
+        "solid": true
+      }
+    },
+    {
+      "id": "puerta_9",
+      "type": "cube",
+      "position": {
+        "col": 10,
+        "row": 9
+      },
+      "texture": "textures/shapes.png",
+      "sourceRect": {
+        "x": 0,
+        "y": 0,
+        "width": 64,
+        "height": 96
+      },
+      "groundOffset": 17,
+      "collider": {
+        "width": 64,
+        "height": 32,
+        "solid": true
+      }
+    },
+    {
+      "id": "jefe_1",
+      "type": "enemy",
+      "position": {
+        "col": 15,
+        "row": 5
+      },
+      "texture": "textures/player2.png",
+      "sourceRect": {
+        "x": 0,
+        "y": 0,
+        "width": 16,
+        "height": 16
+      },
+      "scale": 3,
+      "collider": {
+        "width": 24,
+        "height": 24
+      },
+      "stats": {
+        "health": 150,
+        "damage": 12,
+        "speed": 1.2
+      },
+      "boss": true,
+      "weapon": "hacha_jefe",
+      "drops": [
+        {
+          "item": "lanza",
+          "chance": 1
+        },
+        {
+          "item": "bolsa_monedas",
+          "chance": 1
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "trigger": {
+        "type": "on_zone_cleared",
+        "params": {
+          "zone": "arena"
+        }
+      },
+      "actions": [
+        {
+          "type": "hide_entity",
+          "params": {
+            "entity": "puerta_1"
+          }
+        },
+        {
+          "type": "hide_entity",
+          "params": {
+            "entity": "puerta_2"
+          }
+        },
+        {
+          "type": "hide_entity",
+          "params": {
+            "entity": "puerta_3"
+          }
+        },
+        {
+          "type": "hide_entity",
+          "params": {
+            "entity": "puerta_4"
+          }
+        },
+        {
+          "type": "hide_entity",
+          "params": {
+            "entity": "puerta_5"
+          }
+        },
+        {
+          "type": "hide_entity",
+          "params": {
+            "entity": "puerta_6"
+          }
+        },
+        {
+          "type": "hide_entity",
+          "params": {
+            "entity": "puerta_7"
+          }
+        },
+        {
+          "type": "hide_entity",
+          "params": {
+            "entity": "puerta_8"
+          }
+        },
+        {
+          "type": "hide_entity",
+          "params": {
+            "entity": "puerta_9"
+          }
+        },
+        {
+          "type": "set_flag",
+          "params": {
+            "flag": "puzzle_arena_resuelto"
+          }
+        },
+        {
+          "type": "show_message",
+          "params": {
+            "text": "¡Las puertas se abrieron! Cuidado con el jefe."
+          }
+        }
+      ]
+    },
+    {
+      "trigger": {
+        "type": "on_player_enter_zone",
+        "params": {
+          "zone": "sala_jefe"
+        }
+      },
+      "conditions": [
+        {
+          "type": "flag_is_not_set",
+          "params": {
+            "flag": "jefe_anunciado"
+          }
+        }
+      ],
+      "actions": [
+        {
+          "type": "show_message",
+          "params": {
+            "text": "¡El jefe despertó!"
+          }
+        },
+        {
+          "type": "set_flag",
+          "params": {
+            "flag": "jefe_anunciado"
+          }
+        }
+      ]
+    },
+    {
+      "trigger": {
+        "type": "on_boss_defeated",
+        "params": {}
+      },
+      "actions": [
+        {
+          "type": "show_message",
+          "params": {
+            "text": "¡Jefe vencido! Recibiste un tótem de curación."
+          }
+        },
+        {
+          "type": "give_item",
+          "params": {
+            "item": "totem_curacion"
+          }
+        }
+      ]
+    },
+    {
+      "trigger": {
+        "type": "on_items_collected",
+        "params": {
+          "item": "moneda",
+          "count": 0
+        }
+      },
+      "actions": [
+        {
+          "type": "show_message",
+          "params": {
+            "text": "Juntaste todas las monedas del piso: +5 de premio"
+          }
+        },
+        {
+          "type": "add_coins",
+          "params": {
+            "amount": 5
+          }
+        }
+      ]
+    },
+    {
+      "trigger": {
+        "type": "on_ability_used",
+        "params": {
+          "item": ""
+        }
+      },
+      "actions": [
+        {
+          "type": "play_sound",
+          "params": {
+            "soundPath": "sounds/hit.wav"
+          }
+        }
+      ]
+    }
+  ]
+}

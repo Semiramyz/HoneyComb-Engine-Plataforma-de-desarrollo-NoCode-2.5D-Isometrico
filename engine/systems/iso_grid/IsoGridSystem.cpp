@@ -47,6 +47,15 @@ GridCoord IsoGridSystem::ScreenToGrid(Vector2 screenPos) const {
     };
 }
 
+Vector2 IsoGridSystem::ScreenToGridContinuous(Vector2 screenPos) const {
+    float halfW = tileWidth_ / 2.0f;
+    float halfH = tileHeight_ / 2.0f;
+    return Vector2{
+        (screenPos.x / halfW + screenPos.y / halfH) / 2.0f,
+        (screenPos.y / halfH - screenPos.x / halfW) / 2.0f
+    };
+}
+
 // Una celda es valida solo si cae DENTRO de la grilla declarada por el nivel.
 // Lo usa el editor para no colocar entidades fuera, y el runtime para frenar al
 // jugador en los bordes.

@@ -1,5 +1,5 @@
 {
-  "$comment": "Catalogo de bloques disponibles para armar eventos en el editor. Es la lista de piezas del NoCode: el editor genera los formularios del panel de eventos leyendo esto, sin nada hardcodeado, asi que sumar un bloque aca lo hace aparecer en la interfaz sin tocar codigo Angular. Del lado del motor, cada 'type' necesita ademas su implementacion registrada una vez en C++ (RegisterTrigger / RegisterCondition / RegisterAction, ver engine/main.cpp). Un type declarado aca pero no registrado alla simplemente no hace nada: el nivel sigue corriendo. Un evento ejecuta sus acciones UNA vez, cuando su trigger y sus condiciones pasan a cumplirse; para repetirse tiene que dejar de cumplirse primero.",
+  "$comment": "Catalogo de bloques disponibles para armar eventos en el editor. Es la lista de piezas del NoCode: el editor genera los formularios del panel de eventos leyendo esto, sin nada hardcodeado, asi que sumar un bloque aca lo hace aparecer en la interfaz sin tocar codigo Angular. Del lado del motor, cada 'type' necesita ademas su implementacion registrada una vez en C++ (RegisterTrigger / RegisterCondition / RegisterAction, ver engine/main.cpp). Un type declarado aca pero no registrado alla simplemente no hace nada: el nivel sigue corriendo. Un evento ejecuta sus acciones UNA vez, cuando su trigger y sus condiciones pasan a cumplirse; para repetirse tiene que dejar de cumplirse primero. Tipos de parametro: entity_ref (entidad del nivel), level_ref (archivo de levels/), item_ref (objeto de 'items' del nivel; vacio = cualquiera), zone_ref (sala o zona del nivel), string, number, boolean.",
   "triggers": [
     {
       "type": "on_collision",
@@ -13,7 +13,7 @@
     {
       "type": "on_entity_destroyed",
       "label": "Al eliminar una entidad",
-      "description": "Se dispara cuando la entidad deja de estar en el nivel: vencida en combate o destruida por un evento.",
+      "description": "Se dispara cuando la entidad deja de estar en el nivel: vencida en combate, juntada (un objeto) o destruida por un evento.",
       "params": {
         "entity": { "type": "entity_ref", "description": "Entidad que tiene que desaparecer" }
       }
@@ -23,6 +23,45 @@
       "label": "Al vencer a todos los enemigos",
       "description": "Se dispara cuando no queda ningun enemigo (type 'enemy') en pie. Un nivel sin enemigos no lo dispara nunca.",
       "params": {}
+    },
+    {
+      "type": "on_boss_defeated",
+      "label": "Al vencer al jefe",
+      "description": "Se dispara cuando cae el ultimo enemigo marcado como jefe. Un nivel sin jefes no lo dispara nunca.",
+      "params": {}
+    },
+    {
+      "type": "on_zone_cleared",
+      "label": "Al limpiar una zona",
+      "description": "Se dispara cuando caen todos los enemigos que arrancaron dentro de la sala o zona, aunque hayan salido persiguiendo al jugador. Una zona sin enemigos no lo dispara nunca.",
+      "params": {
+        "zone": { "type": "zone_ref", "description": "Sala o zona a limpiar" }
+      }
+    },
+    {
+      "type": "on_items_collected",
+      "label": "Al juntar objetos",
+      "description": "Recoleccion: se dispara al juntar 'count' objetos de ese tipo. Con count 0, al juntar TODOS los que hay colocados en el nivel. Sin objeto elegido cuenta cualquiera.",
+      "params": {
+        "item": { "type": "item_ref", "description": "Objeto a juntar; vacio = cualquiera" },
+        "count": { "type": "number", "description": "Cuantos; 0 = todos los del nivel" }
+      }
+    },
+    {
+      "type": "on_player_enter_zone",
+      "label": "Al entrar a una zona",
+      "description": "Se dispara cuando el jugador entra a la sala o zona. Sirve para cerrar las puertas de un puzzle.",
+      "params": {
+        "zone": { "type": "zone_ref", "description": "Sala o zona" }
+      }
+    },
+    {
+      "type": "on_ability_used",
+      "label": "Al usar una habilidad",
+      "description": "Se dispara cuando el jugador lanza la habilidad de un arma.",
+      "params": {
+        "item": { "type": "item_ref", "description": "Arma; vacio = cualquiera" }
+      }
     }
   ],
   "conditions": [
@@ -32,6 +71,38 @@
       "description": "Se cumple si una accion 'Activar marca' ya activo esa marca en este nivel. Es la pieza de los puzzles: tener la llave, haber pisado la palanca.",
       "params": {
         "flag": { "type": "string", "description": "Nombre de la marca, por ejemplo tiene_llave" }
+      }
+    },
+    {
+      "type": "flag_is_not_set",
+      "label": "Si la marca no está activa",
+      "description": "Lo contrario de 'Si la marca está activa'. Evita repetir algo ya hecho: volver a entrar a una sala resuelta no vuelve a cerrar sus puertas.",
+      "params": {
+        "flag": { "type": "string", "description": "Nombre de la marca" }
+      }
+    },
+    {
+      "type": "has_item",
+      "label": "Si tiene el arma",
+      "description": "Se cumple si el arma esta en el inventario del jugador.",
+      "params": {
+        "item": { "type": "item_ref", "description": "Arma" }
+      }
+    },
+    {
+      "type": "coins_at_least",
+      "label": "Si tiene monedas",
+      "description": "Se cumple si el jugador tiene al menos esa cantidad de monedas.",
+      "params": {
+        "amount": { "type": "number", "description": "Monedas" }
+      }
+    },
+    {
+      "type": "player_in_zone",
+      "label": "Si el jugador está en la zona",
+      "description": "Se cumple mientras el jugador este dentro de la sala o zona.",
+      "params": {
+        "zone": { "type": "zone_ref", "description": "Sala o zona" }
       }
     }
   ],
@@ -53,6 +124,22 @@
       }
     },
     {
+      "type": "show_entity",
+      "label": "Mostrar entidad",
+      "description": "Hace aparecer una entidad oculta: vuelve a dibujarse, a bloquear y a pelear. Cerrar una puerta.",
+      "params": {
+        "entity": { "type": "entity_ref", "description": "Entidad a mostrar" }
+      }
+    },
+    {
+      "type": "hide_entity",
+      "label": "Ocultar entidad",
+      "description": "Oculta una entidad sin destruirla: no se dibuja, no bloquea ni pelea. Abrir una puerta.",
+      "params": {
+        "entity": { "type": "entity_ref", "description": "Entidad a ocultar" }
+      }
+    },
+    {
       "type": "set_flag",
       "label": "Activar marca",
       "description": "Activa una marca con nombre que despues consulta la condicion 'Si la marca está activa'. Las marcas se borran al cambiar de nivel.",
@@ -61,9 +148,49 @@
       }
     },
     {
+      "type": "give_item",
+      "label": "Dar objeto",
+      "description": "Le da un objeto al jugador como si lo hubiera juntado: un arma va al inventario, una curacion cura, una moneda suma.",
+      "params": {
+        "item": { "type": "item_ref", "description": "Objeto" }
+      }
+    },
+    {
+      "type": "add_coins",
+      "label": "Dar monedas",
+      "description": "Suma (o resta, con un numero negativo) monedas al jugador.",
+      "params": {
+        "amount": { "type": "number", "description": "Monedas" }
+      }
+    },
+    {
+      "type": "heal_player",
+      "label": "Curar al jugador",
+      "description": "Devuelve vida al jugador, sin pasar de su vida inicial.",
+      "params": {
+        "amount": { "type": "number", "description": "Vida" }
+      }
+    },
+    {
+      "type": "set_inventory_slots",
+      "label": "Cambiar tamaño del inventario",
+      "description": "Cambia el limite de armas del jugador (1 a 9). No hace nada si el inventario tiene el limite bloqueado.",
+      "params": {
+        "slots": { "type": "number", "description": "Casilleros" }
+      }
+    },
+    {
+      "type": "show_message",
+      "label": "Mostrar mensaje",
+      "description": "Muestra un texto en el centro de la pantalla unos segundos.",
+      "params": {
+        "text": { "type": "string", "description": "Mensaje" }
+      }
+    },
+    {
       "type": "load_level",
       "label": "Pasar a otro nivel",
-      "description": "Muestra la pantalla de nivel superado con el mensaje y carga otro nivel de la misma carpeta levels/.",
+      "description": "Muestra la pantalla de nivel superado con el mensaje y carga otro nivel de la misma carpeta levels/. El jugador conserva sus armas y monedas.",
       "params": {
         "level": { "type": "level_ref", "description": "Archivo del nivel siguiente" },
         "message": { "type": "string", "description": "Texto de la pantalla; vacio = ¡Nivel superado!" }

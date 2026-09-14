@@ -26,6 +26,11 @@ public:
     // Posicion en pantalla -> celda de grilla bajo ese punto (para mouse/click).
     GridCoord ScreenToGrid(Vector2 screenPos) const;
 
+    // Igual, pero sin llevarlo a una celda entera: la posicion continua bajo
+    // ese punto. Es la que necesita apuntar con el mouse, que no apunta a una
+    // casilla sino a un lugar. Inversa exacta de GridToScreen(Vector2).
+    Vector2 ScreenToGridContinuous(Vector2 screenPos) const;
+
     bool IsValidCoord(GridCoord coord) const;
 
     int GetGridWidth() const;

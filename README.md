@@ -343,3 +343,19 @@ Antes de empezar a desarrollar funcionalidades, confirma este flujo mínimo end-
 3. El runtime puede leer y parsear ese mismo `.json` de prueba usando `nlohmann::json`, sin necesidad de recompilar el motor si el archivo cambia.
 
 Si los tres puntos funcionan, el entorno está listo para empezar a implementar los sistemas del motor (`IsoGridSystem`, `ZSortSystem`, `CollisionSystem`, `EventSystem`) y las pantallas del editor.
+
+---
+
+## 10. Sistema de combate, objetos, inventario y puzzles
+
+El editor arma el combate sin código y el runtime lo ejecuta desde el mismo JSON:
+
+- **Armas** cuerpo a cuerpo y a distancia con seis formas de ataque: lineal, área, reloj (sector), proyectil, área remota con alcance máximo y proyectil explosivo con daño de área.
+- **Habilidades** que se cargan acertando golpes, con contador por arma, lanzamiento automático o con Q, y pérdida del contador por tiempo.
+- **Movilidad:** esquive con i-frames y defensa que reduce el daño.
+- **Objetos:** armas, curaciones y monedas. Los enemigos pueden soltar botín con probabilidad y los NPC pueden tener tienda.
+- **Inventario** de 1 a 9 armas con límite bloqueable y reemplazo automático, manual o bloqueado.
+- **Puzzles de sala:** vencer a un jefe, completar una recolección o limpiar una zona para abrir el paso, más eventos con condiciones.
+
+Guía completa (modelo de datos, eventos, controles): [`docs/sistema-de-combate.md`](docs/sistema-de-combate.md).
+Nivel de ejemplo: `levels/combate_demo.json`, con la biblioteca `items.json`.

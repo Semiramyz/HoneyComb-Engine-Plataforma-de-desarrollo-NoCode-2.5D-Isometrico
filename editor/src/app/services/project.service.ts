@@ -1,11 +1,15 @@
 import { Injectable, signal } from '@angular/core';
 
 import { normalizePreset } from '../core/characters';
+import { normalizeItem } from '../core/items';
 import type { ImportSession, ProjectFileData, ProjectNode } from '../electron-api';
 import { CharacterPreset } from '../models/character-preset.model';
+import { ItemDef } from '../models/item.model';
 
 /** Archivo del proyecto con los personajes configurados, junto a levels/ y assets/. */
 export const CHARACTERS_FILE = 'characters.json';
+/** Archivo del proyecto con la biblioteca de objetos (armas, curaciones, monedas). */
+export const ITEMS_FILE = 'items.json';
 import { EventCatalog } from '../models/event-catalog.model';
 import { Level } from '../models/level.model';
 
@@ -45,6 +49,8 @@ function parseLevel(contents: string, source: string): Level {
 
   return {
     name: typeof data.name === 'string' ? data.name : 'nivel',
+    // Faltaba: abrir un nivel y volver a guardarlo le borraba el color de fondo.
+    backgroundColor: data.backgroundColor,
     grid,
     entities: Array.isArray(data.entities) ? data.entities : [],
     events: Array.isArray(data.events) ? data.events : [],
@@ -55,6 +61,9 @@ function parseLevel(contents: string, source: string): Level {
     rooms: data.rooms,
     tunnels: data.tunnels,
     tileEdits: data.tileEdits,
+    // Y sin estas dos, las zonas de los puzzles y los objetos que usa el nivel.
+    zones: Array.isArray(data.zones) ? data.zones : undefined,
+    items: Array.isArray(data.items) ? data.items.map((item) => normalizeItem(item)) : undefined,
   };
 }
 
@@ -212,6 +221,36 @@ export class ProjectService {
 
   async writeCharacterPresets(presets: CharacterPreset[]): Promise<void> {
     await window.honeycombProject.writeFile(CHARACTERS_FILE, JSON.stringify({ presets }, null, 2));
+  }
+
+  /**
+   * Biblioteca de objetos del proyecto. Igual que los personajes: sin archivo
+   * es una lista vacia, y cualquier otro fallo se informa para que el proximo
+   * guardado no pise un archivo que solo no se pudo leer.
+   */
+  async readItemLibrary(): Promise<ItemDef[]> {
+    let contents: string;
+    try {
+      contents = await window.honeycombProject.readFile(ITEMS_FILE);
+    } catch (error) {
+      if (String(error).includes('ENOENT')) {
+        return [];
+      }
+      throw error;
+    }
+
+    let raw: unknown;
+    try {
+      raw = JSON.parse(contents);
+    } catch {
+      throw new Error(`${ITEMS_FILE} no es un JSON valido.`);
+    }
+    const list = (raw as { items?: unknown } | null)?.items;
+    return Array.isArray(list) ? list.map((item) => normalizeItem(item)) : [];
+  }
+
+  async writeItemLibrary(items: ItemDef[]): Promise<void> {
+    await window.honeycombProject.writeFile(ITEMS_FILE, JSON.stringify({ items }, null, 2));
   }
 
   async readEventCatalog(): Promise<EventCatalog> {

@@ -8,6 +8,7 @@
 #include "nlohmann/json.hpp"
 
 #include "loader/EventLoader.hpp"
+#include "loader/ItemLoader.hpp"
 
 LevelLoader::LevelLoader(ResourceManager& resources, AssetResolver& assets)
     : resources_(resources), assets_(assets) {}
@@ -203,7 +204,27 @@ LoadedLevel LevelLoader::Load(const std::string& levelPath, EventSystem& eventSy
                 entity.colliderSolid = false;
             }
 
+            // Combate, objetos y puzzles: todo opcional (ver ItemLoader).
+            ItemLoader::ParseEntityCombat(entityJson, entity);
+            entity.startPosition = entity.precisePosition;
+
             level.entities.push_back(entity);
+        }
+    }
+
+    // --- Objetos y zonas -------------------------------------------------------
+    // Los objetos se leen enteros (no son referencias a otro archivo): el nivel
+    // se juega solo, sin la biblioteca items.json del editor.
+    if (levelJson.contains("items")) {
+        level.items = ItemLoader::ParseItems(levelJson.at("items"), resources_, assets_);
+    }
+    // Las salas del editor tambien son zonas: asi "Al limpiar una zona" sirve
+    // con una sala sin tener que dibujar la zona dos veces.
+    for (const char* key : {"rooms", "zones"}) {
+        if (levelJson.contains(key) && levelJson.at(key).is_array()) {
+            for (const auto& zoneJson : levelJson.at(key)) {
+                level.zones.push_back(ItemLoader::ParseZone(zoneJson));
+            }
         }
     }
 

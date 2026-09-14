@@ -18,7 +18,10 @@ import {
   MapTile,
   MapTunnel,
   RoomSide,
+  Zone,
 } from '../models/level.model';
+import { withItemDefs } from '../core/items';
+import { ItemDef } from '../models/item.model';
 import { ProjectService } from './project.service';
 
 // 64x32 es la proporcion 2:1 estandar del pixel art isometrico, y el mismo
@@ -421,5 +424,57 @@ export class LevelService {
       ...level,
       events: level.events.filter((_, i) => i !== index),
     }));
+  }
+
+  // --- Combate, objetos y puzzles --------------------------------------------
+
+  addEvents(events: readonly EventDefinition[]): void {
+    this.level.update((level) => ({ ...level, events: [...level.events, ...events] }));
+  }
+
+  /** Copia definiciones de objetos a "items" del nivel (reemplaza por id). Ver core/items.ts. */
+  upsertItems(defs: readonly ItemDef[]): void {
+    this.level.update((level) => withItemDefs(level, defs));
+  }
+
+  /** Varios cambios de entidad en una sola actualizacion: lo que arma un puzzle. */
+  applyEntityChanges(changes: readonly { id: string; changes: Partial<LevelEntity> }[]): void {
+    const byId = new Map(changes.map((change) => [change.id, change.changes]));
+    this.level.update((level) => ({
+      ...level,
+      entities: level.entities.map((entity) => {
+        const patch = byId.get(entity.id);
+        return patch ? { ...entity, ...patch } : entity;
+      }),
+    }));
+  }
+
+  addZone(zone: Zone): void {
+    this.level.update((level) => ({ ...level, zones: [...(level.zones ?? []), zone] }));
+  }
+
+  updateZone(id: string, changes: Partial<Omit<Zone, 'id'>>): void {
+    this.level.update((level) => ({
+      ...level,
+      zones: (level.zones ?? []).map((zone) =>
+        zone.id === id
+          ? {
+              ...zone,
+              ...changes,
+              col: Math.max(0, Math.round(changes.col ?? zone.col)),
+              row: Math.max(0, Math.round(changes.row ?? zone.row)),
+              width: Math.max(1, Math.round(changes.width ?? zone.width)),
+              height: Math.max(1, Math.round(changes.height ?? zone.height)),
+            }
+          : zone,
+      ),
+    }));
+  }
+
+  removeZone(id: string): void {
+    this.level.update((level) => {
+      const zones = (level.zones ?? []).filter((zone) => zone.id !== id);
+      return { ...level, zones: zones.length ? zones : undefined };
+    });
   }
 }

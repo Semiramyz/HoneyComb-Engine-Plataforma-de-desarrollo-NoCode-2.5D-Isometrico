@@ -11,8 +11,10 @@
 //                      Input -> logica reutilizable, sin saber de niveles.
 //   Capa 3 (loader/)   AssetResolver, LevelLoader, EventLoader -> leen el JSON
 //                      y arman con el las estructuras de la Capa 2.
-//   Capa 4 (game/)     Movement, Combat -> las reglas del juego sobre el nivel
-//                      ya cargado: por donde se camina y quien le pega a quien.
+//   Capa 4 (game/)     Movement, Mobility, Combat, Inventory, Loot, Zones ->
+//                      las reglas del juego sobre el nivel ya cargado: por
+//                      donde se camina, quien le pega a quien, que se junta.
+//                      CombatView dibuja lo que esas reglas dejaron.
 //
 // Nada de lo que hay aca esta atado a un nivel concreto: el tamano de la
 // grilla, las texturas, las entidades y los eventos salen todos del archivo de
@@ -20,8 +22,10 @@
 // recompilar. Eso es lo que hace que el editor NoCode tenga sentido.
 //
 // Uso:  engine.exe [ruta/al/nivel.json]     (por defecto: levels/test_level.json)
-// Teclas: flechas o WASD = mover | Espacio o J = atacar | F1 = ver grilla |
-//         F11 = pantalla completa
+// Teclas: flechas o WASD = mover | clic izquierdo, Espacio o J = atacar hacia
+//         el mouse | Q = habilidad | Shift = esquivar | clic derecho o K =
+//         defender | 1-9 o rueda = elegir arma | E = cambiar arma / tienda |
+//         F1 = ver grilla | F11 = pantalla completa
 // =============================================================================
 
 #include <algorithm>
@@ -37,7 +41,12 @@
 #include "core/GraphicsDevice.hpp"
 #include "core/ResourceManager.hpp"
 #include "game/Combat.hpp"
+#include "game/CombatView.hpp"
+#include "game/Inventory.hpp"
+#include "game/Loot.hpp"
+#include "game/Mobility.hpp"
 #include "game/Movement.hpp"
+#include "game/Zones.hpp"
 #include "loader/AssetResolver.hpp"
 #include "loader/LevelLoader.hpp"
 #include "systems/animation/AnimationSystem.hpp"
@@ -54,6 +63,49 @@ namespace {
 constexpr float kTransitionSeconds = 2.0f;
 // Cuanto se ve un aviso de error (por ejemplo, un nivel siguiente que no existe).
 constexpr float kNoticeSeconds = 4.0f;
+// Cuanto se ve un mensaje de "Mostrar mensaje", y uno de lo que se junto.
+constexpr float kMessageSeconds = 3.0f;
+constexpr float kPickupMessageSeconds = 1.5f;
+
+// Como se llego a un nivel. Decide que pasa con el inventario del jugador.
+enum class LevelStart
+{
+    Fresh,    // el primer nivel: el inventario que declara el jugador
+    Carry,    // se paso de nivel: se conservan armas y monedas
+    Restart,  // se perdio: vuelve a como estaba al entrar a este nivel
+};
+
+// Un parametro numerico de un evento. Acepta numero o texto con un numero: el
+// JSON se puede escribir a mano, y los niveles guardados por versiones
+// anteriores del editor guardaban los campos numericos como texto.
+float NumberParam(const nlohmann::json &params, const char *key, float fallback)
+{
+    if (!params.contains(key))
+    {
+        return fallback;
+    }
+    const auto &value = params.at(key);
+    if (value.is_number())
+    {
+        return value.get<float>();
+    }
+    if (value.is_string())
+    {
+        try
+        {
+            return std::stof(value.get<std::string>());
+        }
+        catch (const std::exception &)
+        {
+        }
+    }
+    return fallback;
+}
+
+std::string StringParam(const nlohmann::json &params, const char *key)
+{
+    return params.contains(key) && params.at(key).is_string() ? params.at(key).get<std::string>() : std::string();
+}
 
 // Dibuja un texto centrado en X. raylib no centra solo: hay que medirlo.
 void DrawCentered(GraphicsDevice& gfx, const Font& font, const std::string& text, float centerX,
@@ -152,7 +204,20 @@ int main(int argc, char *argv[])
     // no define ninguna, el nivel igual corre: solo que no hay nada que mover.
     LevelEntity *player = nullptr;
 
-    auto prepareLevel = [&]()
+    // Combate, objetos y movilidad (ver game/). El inventario es lo unico que
+    // NO es del nivel: viaja con el jugador de un nivel al siguiente.
+    Combat::State combatState;
+    Inventory inventory;
+    Inventory inventoryAtLevelStart;
+    Loot::State loot;
+    Mobility::State mobility;
+    // El NPC cuya tienda esta abierta. Mientras no es nullptr el juego se pausa.
+    LevelEntity *shopNpc = nullptr;
+    std::string shopFeedback;
+    // Armas cuya habilidad se lanzo en este frame, para "Al usar una habilidad".
+    std::vector<std::string> abilitiesUsedThisFrame;
+
+    auto prepareLevel = [&](LevelStart start)
     {
         entityById.clear();
         animInstances.clear();
@@ -192,10 +257,33 @@ int main(int argc, char *argv[])
         }
 
         player = entityById.count("player_1") ? entityById["player_1"] : nullptr;
+
+        // Todo lo del combate apunta a entidades del nivel anterior: se vacia.
+        combatState.Clear();
+        loot.ClearLevel();
+        mobility = Mobility::State{};
+        shopNpc = nullptr;
+        abilitiesUsedThisFrame.clear();
+        const InventoryConfig noConfig;
+        const InventoryConfig &inventoryConfig = player ? player->inventory : noConfig;
+        switch (start)
+        {
+        case LevelStart::Fresh:
+            inventory.Configure(inventoryConfig, level.items);
+            break;
+        case LevelStart::Carry:
+            inventory.CarryInto(inventoryConfig, level.items);
+            break;
+        case LevelStart::Restart:
+            inventory = inventoryAtLevelStart;
+            break;
+        }
+        inventoryAtLevelStart = inventory;
+
         std::cout << "Nivel cargado: " << level.name
                   << " (" << level.entities.size() << " entidades)" << std::endl;
     };
-    prepareLevel();
+    prepareLevel(LevelStart::Fresh);
 
     // --- AudioSystem ---
     AudioSystem audio;
@@ -216,6 +304,10 @@ int main(int argc, char *argv[])
     input.BindAction("move_right_wasd", KEY_D);
     input.BindAction("attack", KEY_SPACE);
     input.BindAction("attack_alt", KEY_J);
+    input.BindAction("ability", KEY_Q);
+    input.BindAction("dash", KEY_LEFT_SHIFT);
+    input.BindAction("defend", KEY_K);
+    input.BindAction("interact", KEY_E);
 
     // --- Paso entre niveles -------------------------------------------------
     // Pasar de nivel no es instantaneo: primero se muestra la pantalla con el
@@ -230,10 +322,12 @@ int main(int argc, char *argv[])
         std::string title;
         std::string detail;
         float remaining = 0.0f;
+        // true = se perdio y se vuelve a empezar: el inventario no se conserva.
+        bool restart = false;
     };
     Transition transition;
 
-    auto beginTransition = [&](const std::filesystem::path &target, const std::string &title)
+    auto beginTransition = [&](const std::filesystem::path &target, const std::string &title, bool restart)
     {
         // Una sola a la vez: la primera que se pida es la que vale.
         if (transition.active)
@@ -241,12 +335,24 @@ int main(int argc, char *argv[])
             return;
         }
         transition = Transition{true, target, title,
-                                "Cargando " + target.stem().string() + "...", kTransitionSeconds};
+                                "Cargando " + target.stem().string() + "...", kTransitionSeconds, restart};
         std::cout << title << " -> " << target.string() << std::endl;
     };
 
     std::string notice;
     float noticeRemaining = 0.0f;
+
+    // Mensaje en el centro: "Mostrar mensaje" y lo que se junta. Aviso: texto
+    // al pie del inventario mientras dura una situacion (parado sobre un arma
+    // con el inventario lleno, junto a una tienda); se recalcula cada frame.
+    std::string message;
+    float messageRemaining = 0.0f;
+    std::string prompt;
+    auto showMessage = [&](const std::string &text, float seconds)
+    {
+        message = text;
+        messageRemaining = seconds;
+    };
 
     // --- EventSystem: registro de triggers, condiciones y acciones ---------
     // Cada "type" de schema/event_catalog.json necesita su implementacion en
@@ -308,6 +414,11 @@ int main(int argc, char *argv[])
     events.RegisterCondition("flag_is_set", [&flags](const nlohmann::json &params) -> bool
                              { return flags.count(params.value("flag", std::string(""))) > 0; });
 
+    // Condicion "flag_is_not_set": la contraria. Una sala ya resuelta no vuelve
+    // a cerrar sus puertas al entrar.
+    events.RegisterCondition("flag_is_not_set", [&flags](const nlohmann::json &params) -> bool
+                             { return flags.count(StringParam(params, "flag")) == 0; });
+
     // Accion "set_flag": activa una marca con nombre (la llave de un puzzle).
     events.RegisterAction("set_flag", [&flags](const nlohmann::json &params)
                           {
@@ -349,15 +460,135 @@ int main(int argc, char *argv[])
             target += ".json";
         }
         std::string title = params.value("message", std::string(""));
-        beginTransition(target, title.empty() ? "¡Nivel superado!" : title); });
+        beginTransition(target, title.empty() ? "¡Nivel superado!" : title, false); });
+
+    // --- Eventos de combate, objetos y puzzles --------------------------------
+
+    // Trigger "on_boss_defeated": cayo el ultimo jefe. Sin jefes no dispara.
+    events.RegisterTrigger("on_boss_defeated", [&level](const nlohmann::json &) -> bool
+                           {
+        bool anyBoss = false;
+        for (const auto& entity : level.entities) {
+            if (!entity.boss) {
+                continue;
+            }
+            if (!entity.destroyed) {
+                return false;
+            }
+            anyBoss = true;
+        }
+        return anyBoss; });
+
+    // Trigger "on_zone_cleared": cayeron todos los enemigos que arrancaron en la zona.
+    events.RegisterTrigger("on_zone_cleared", [&level](const nlohmann::json &params) -> bool
+                           {
+        const Zone* zone = Zones::Find(level, StringParam(params, "zone"));
+        return zone && Zones::IsCleared(level, *zone); });
+
+    // Trigger "on_items_collected": la recoleccion. Con count 0 (o sin count)
+    // hay que juntar TODOS los objetos colocados de ese tipo; con count N, N
+    // juntados de cualquier origen (colocados o soltados por enemigos).
+    events.RegisterTrigger("on_items_collected", [&level, &loot](const nlohmann::json &params) -> bool
+                           {
+        const std::string item = StringParam(params, "item");
+        const int count = static_cast<int>(NumberParam(params, "count", 0.0f));
+        if (count > 0) {
+            if (item.empty()) {
+                return loot.collectedTotal >= count;
+            }
+            auto it = loot.collected.find(item);
+            return it != loot.collected.end() && it->second >= count;
+        }
+        bool anyPlaced = false;
+        for (const auto& entity : level.entities) {
+            if (entity.itemId.empty() || (!item.empty() && entity.itemId != item)) {
+                continue;
+            }
+            if (!entity.destroyed) {
+                return false;
+            }
+            anyPlaced = true;
+        }
+        return anyPlaced; });
+
+    // Trigger "on_player_enter_zone" y condicion "player_in_zone": la misma
+    // pregunta. Como trigger dispara al ENTRAR (EventSystem ejecuta cuando pasa
+    // a cumplirse); como condicion vale mientras siga adentro.
+    auto playerInZone = [&level, &player](const nlohmann::json &params) -> bool
+    {
+        const Zone *zone = Zones::Find(level, StringParam(params, "zone"));
+        return zone && player && Combat::IsActive(*player) &&
+               Zones::Contains(*zone, Movement::BoxCenter(*player));
+    };
+    events.RegisterTrigger("on_player_enter_zone", playerInZone);
+    events.RegisterCondition("player_in_zone", playerInZone);
+
+    // Trigger "on_ability_used": el jugador lanzo la habilidad de esa arma en este frame.
+    events.RegisterTrigger("on_ability_used", [&abilitiesUsedThisFrame](const nlohmann::json &params) -> bool
+                           {
+        const std::string item = StringParam(params, "item");
+        return std::any_of(abilitiesUsedThisFrame.begin(), abilitiesUsedThisFrame.end(),
+                           [&item](const std::string& used) { return item.empty() || used == item; }); });
+
+    events.RegisterCondition("has_item", [&inventory](const nlohmann::json &params) -> bool
+                             { return inventory.HasItem(StringParam(params, "item")); });
+
+    events.RegisterCondition("coins_at_least", [&inventory](const nlohmann::json &params) -> bool
+                             { return inventory.coins >= NumberParam(params, "amount", 0.0f); });
+
+    // Acciones "show_entity" / "hide_entity": las puertas de un puzzle. Ocultar
+    // no es destruir: no dispara "Al eliminar una entidad" y se puede deshacer.
+    events.RegisterAction("show_entity", [&entityById](const nlohmann::json &params)
+                          {
+        auto it = entityById.find(StringParam(params, "entity"));
+        if (it != entityById.end()) {
+            it->second->hidden = false;
+        } });
+    events.RegisterAction("hide_entity", [&entityById](const nlohmann::json &params)
+                          {
+        auto it = entityById.find(StringParam(params, "entity"));
+        if (it != entityById.end()) {
+            it->second->hidden = true;
+        } });
+
+    events.RegisterAction("give_item", [&level, &player, &inventory, &loot, &showMessage](const nlohmann::json &params)
+                          {
+        auto it = level.items.find(StringParam(params, "item"));
+        if (it == level.items.end() || !player || player->destroyed) {
+            return;
+        }
+        std::string text;
+        Loot::Give(it->second, *player, inventory, loot.ground, true, text);
+        showMessage(text, kPickupMessageSeconds); });
+
+    events.RegisterAction("add_coins", [&inventory](const nlohmann::json &params)
+                          {
+        inventory.coins = std::max(0, inventory.coins + static_cast<int>(NumberParam(params, "amount", 0.0f))); });
+
+    events.RegisterAction("heal_player", [&player](const nlohmann::json &params)
+                          {
+        if (player && !player->destroyed) {
+            player->health = std::min(player->maxHealth, player->health + NumberParam(params, "amount", 0.0f));
+        } });
+
+    // Accion "set_inventory_slots": respeta el limite bloqueado (Inventory lo
+    // ignora), y lo que ya no entra queda en el piso para no perderlo.
+    events.RegisterAction("set_inventory_slots", [&player, &inventory, &loot](const nlohmann::json &params)
+                          {
+        const std::vector<ItemDef> dropped =
+            inventory.SetSlots(static_cast<int>(NumberParam(params, "slots", static_cast<float>(inventory.Slots()))));
+        if (player) {
+            Loot::DropItems(loot, dropped, player->precisePosition);
+        } });
+
+    events.RegisterAction("show_message", [&showMessage](const nlohmann::json &params)
+                          { showMessage(StringParam(params, "text"), kMessageSeconds); });
 
     ZSortSystem zsort(gfx);
     CollisionSystem collision;
     Font defaultFont = GetFontDefault();
     gfx.SetTargetFPS(60);
     bool showGrid = false;
-    // Cuanto le queda al dibujo del golpe del jugador.
-    float swingRemaining = 0.0f;
 
     // Barras de vida a dibujar encima de la escena, juntadas mientras se
     // encolan las entidades (ahi se sabe donde queda cada sprite en pantalla).
@@ -415,79 +646,127 @@ int main(int argc, char *argv[])
             return screenPosition;
         };
 
-        // --- Movimiento del jugador y combate ------------------------------
+        // --- Apuntar ----------------------------------------------------------
+        // El mouse apunta a un LUGAR del mapa, no a una casilla: su posicion en
+        // pantalla se lleva a celdas continuas con la inversa de gridToScreen.
+        const Vector2 mouse = input.GetMousePosition();
+        const Vector2 aim = level.grid.ScreenToGridContinuous(
+            Vector2{mouse.x - gfx.GetScreenWidth() / 2.0f, mouse.y - levelOriginY});
+
+        // --- Jugador, combate y objetos --------------------------------------
         // Con la pantalla de paso de nivel en marcha el juego queda congelado:
-        // ni el jugador ni los enemigos se mueven, y nadie pega.
-        if (!transition.active)
+        // ni el jugador ni los enemigos se mueven, y nadie pega. Con una tienda
+        // abierta tambien, y ahi las teclas 1-9 compran en vez de elegir arma.
+        prompt.clear();
+        abilitiesUsedThisFrame.clear();
+        const bool playerAlive = player && !player->destroyed;
+        const bool interactPressed = input.IsActionPressed("interact");
+        if (!transition.active && shopNpc)
         {
-            if (player && !player->destroyed)
+            if (interactPressed || !playerAlive)
             {
-                // Primero se lee la intencion EN PANTALLA (arriba = arriba visual),
-                // no en coordenadas de grilla: en isometrico son cosas distintas.
-                Vector2 screenDirection{0, 0};
-                if (input.IsActionDown("move_up") || input.IsActionDown("move_up_wasd"))
-                    screenDirection.y -= 1;
-                if (input.IsActionDown("move_down") || input.IsActionDown("move_down_wasd"))
-                    screenDirection.y += 1;
-                if (input.IsActionDown("move_left") || input.IsActionDown("move_left_wasd"))
-                    screenDirection.x -= 1;
-                if (input.IsActionDown("move_right") || input.IsActionDown("move_right_wasd"))
-                    screenDirection.x += 1;
-
-                // Pantalla -> grilla: es la inversa de la proyeccion isometrica.
-                // Sin esta conversion, apretar "arriba" moveria en diagonal dentro
-                // del mundo, que es el error clasico de los juegos isometricos.
-                Vector2 direction{
-                    screenDirection.x + screenDirection.y,
-                    screenDirection.y - screenDirection.x};
-                float directionLength = std::sqrt(direction.x * direction.x + direction.y * direction.y);
-                if (directionLength > 0)
+                shopNpc = nullptr;
+            }
+            else
+            {
+                for (int key = 0; key < 9; ++key)
                 {
-                    // Normalizar: sin esto, moverse en diagonal (dos teclas a la
-                    // vez) seria ~1.41x mas rapido que moverse en linea recta.
-                    direction.x /= directionLength;
-                    direction.y /= directionLength;
-                    // Celdas por segundo: la velocidad configurada ("stats.speed").
-                    const float movementSpeed = player->speed;
-                    // Se calcula una posicion CANDIDATA y solo se acepta si no
-                    // choca con nada. Mover primero y corregir despues produce un
-                    // tembleque visible al arrastrarse contra una pared.
-                    const Vector2 candidate = Movement::ClampToGrid(level, Vector2{
-                        player->precisePosition.x + direction.x * movementSpeed * deltaTime,
-                        player->precisePosition.y + direction.y * movementSpeed * deltaTime});
-
-                    if (Movement::CanOccupy(level, *player, candidate))
+                    if (IsKeyPressed(KEY_ONE + key))
                     {
-                        player->precisePosition = candidate;
-                        // La celda entera se mantiene sincronizada para lo que
-                        // razona por celdas; precisePosition es la que manda para
-                        // dibujar y para colisionar.
-                        player->position = GridCoord{
-                            static_cast<int>(std::round(candidate.x)),
-                            static_cast<int>(std::round(candidate.y))};
+                        const std::string result = Loot::Buy(level, *shopNpc, key, *player, inventory, loot);
+                        if (!result.empty())
+                        {
+                            shopFeedback = result;
+                        }
                     }
                 }
             }
+        }
+        else if (!transition.active)
+        {
+            if (playerAlive)
+            {
+                for (int key = 0; key < 9; ++key)
+                {
+                    if (IsKeyPressed(KEY_ONE + key))
+                    {
+                        inventory.Select(key);
+                    }
+                }
+                const float wheel = GetMouseWheelMove();
+                if (wheel != 0.0f)
+                {
+                    inventory.Cycle(wheel > 0.0f ? -1 : 1);
+                }
 
-            const bool attackPressed =
-                input.IsActionPressed("attack") || input.IsActionPressed("attack_alt");
-            const Combat::FrameResult combat = Combat::Update(level, player, attackPressed, deltaTime);
-            if (combat.playerSwung)
-            {
-                swingRemaining = Combat::kSwingDuration;
+                // La intencion se lee EN PANTALLA (arriba = arriba visual), no en
+                // coordenadas de grilla: en isometrico son cosas distintas.
+                // Mobility hace la conversion.
+                Mobility::Intent move;
+                if (input.IsActionDown("move_up") || input.IsActionDown("move_up_wasd"))
+                    move.screenDirection.y -= 1;
+                if (input.IsActionDown("move_down") || input.IsActionDown("move_down_wasd"))
+                    move.screenDirection.y += 1;
+                if (input.IsActionDown("move_left") || input.IsActionDown("move_left_wasd"))
+                    move.screenDirection.x -= 1;
+                if (input.IsActionDown("move_right") || input.IsActionDown("move_right_wasd"))
+                    move.screenDirection.x += 1;
+                move.dashPressed = input.IsActionPressed("dash");
+                move.defendHeld = input.IsActionDown("defend") || input.IsMouseButtonDown(MOUSE_BUTTON_RIGHT);
+                const Vector2 center = Movement::BoxCenter(*player);
+                move.aimDirection = Vector2{aim.x - center.x, aim.y - center.y};
+                Mobility::UpdatePlayer(level, *player, mobility, move, deltaTime);
             }
-            for (const auto &id : combat.defeated)
+
+            Combat::PlayerIntent intent;
+            intent.aim = aim;
+            intent.attack = input.IsActionPressed("attack") || input.IsActionPressed("attack_alt") ||
+                            input.IsMouseButtonPressed(MOUSE_BUTTON_LEFT);
+            intent.ability = input.IsActionPressed("ability");
+            intent.defending = mobility.defending;
+            intent.invulnerable = Mobility::IsInvulnerable(mobility);
+            intent.defenseReduction = player ? player->defense.reduction : 0.0f;
+            const Combat::FrameResult combat =
+                Combat::Update(level, combatState, player, inventory, intent, deltaTime);
+            for (LevelEntity *enemy : combat.defeated)
             {
-                std::cout << "Enemigo vencido: '" << id << "'" << std::endl;
+                std::cout << "Enemigo vencido: '" << enemy->id << "'" << std::endl;
+                Loot::RollDrops(level, *enemy, loot);
             }
+            abilitiesUsedThisFrame = combat.abilitiesUsed;
+
+            if (playerAlive)
+            {
+                // Junto a un NPC con tienda, E abre la tienda en vez de cambiar un
+                // arma: las dos cosas no pueden colgar de la misma tecla a la vez.
+                LevelEntity *nearShop = Loot::NearbyShop(level, *player);
+                const Loot::PickupFrame pickup =
+                    Loot::UpdatePickups(level, *player, inventory, loot, interactPressed && !nearShop, deltaTime);
+                if (!pickup.message.empty())
+                {
+                    showMessage(pickup.message, kPickupMessageSeconds);
+                }
+                prompt = pickup.prompt;
+                if (nearShop && interactPressed)
+                {
+                    shopNpc = nearShop;
+                    shopFeedback.clear();
+                }
+                else if (nearShop && prompt.empty())
+                {
+                    prompt = "E: tienda de " + nearShop->id;
+                }
+            }
+
             // Perder vuelve a empezar el MISMO nivel, con la misma pantalla de
-            // paso: recargarlo desde el disco lo deja exactamente como arranca.
+            // paso: recargarlo desde el disco lo deja exactamente como arranca,
+            // y el inventario vuelve a como estaba al entrar.
             if (combat.playerDefeated)
             {
-                beginTransition(currentLevelPath, "Derrotado");
+                beginTransition(currentLevelPath, "Derrotado", true);
             }
         }
-        swingRemaining = std::max(0.0f, swingRemaining - deltaTime);
+        messageRemaining = std::max(0.0f, messageRemaining - deltaTime);
 
         // Fondo elegido en el editor. El texto del HUD cambia a claro sobre un
         // fondo oscuro, porque el gris oscuro de siempre ahi no se leeria.
@@ -572,7 +851,8 @@ int main(int argc, char *argv[])
         healthBars.clear();
         for (auto &entity : level.entities)
         {
-            if (entity.destroyed)
+            // Oculta = una puerta abierta: ni se ve ni colisiona.
+            if (entity.destroyed || entity.hidden)
             {
                 continue;
             }
@@ -657,6 +937,9 @@ int main(int argc, char *argv[])
             }
         }
 
+        // Objetos tirados en el piso: sprites como los demas, ordenados con ellos.
+        CombatView::SubmitGroundItems(zsort, loot, gridToScreen, static_cast<float>(GetTime()));
+
         // Recien aca se dibuja todo lo encolado, ya ordenado por profundidad.
         zsort.Flush();
 
@@ -689,18 +972,11 @@ int main(int argc, char *argv[])
             }
         }
 
-        // --- Golpe del jugador ------------------------------------------------
-        // El alcance del ataque dibujado sobre el piso. Un circulo en celdas se
-        // ve como una elipse en isometrico: un paso de celda mide medio tile a
-        // lo ancho y medio tile a lo alto, por eso los dos radios.
-        if (swingRemaining > 0.0f && player && !player->destroyed)
-        {
-            const Vector2 center = gridToScreen(player->precisePosition);
-            const float radiusX = Combat::kPlayerAttackRange * level.grid.GetTileWidth() / 2.0f * 1.414f;
-            const float radiusY = Combat::kPlayerAttackRange * level.grid.GetTileHeight() / 2.0f * 1.414f;
-            DrawEllipseLines(static_cast<int>(center.x), static_cast<int>(center.y), radiusX, radiusY,
-                             Color{255, 220, 120, 230});
-        }
+        // --- Golpes, areas y proyectiles --------------------------------------
+        // Encima de la escena: son la lectura del combate y no deben quedar
+        // tapados por una pared.
+        CombatView::DrawEffects(combatState, gridToScreen);
+        CombatView::DrawProjectiles(combatState, gridToScreen);
 
         // --- Barras de vida sobre las cabezas --------------------------------
         for (const auto &bar : healthBars)
@@ -731,13 +1007,49 @@ int main(int argc, char *argv[])
                                          " / " + std::to_string(static_cast<int>(player->maxHealth));
             gfx.DrawText(defaultFont, lifeText.c_str(), {230, 10}, 20, hudText);
         }
-        gfx.DrawText(defaultFont, "Flechas/WASD mover  |  Espacio o J atacar",
-                     {10, static_cast<float>(gfx.GetScreenHeight() - 28)}, 18, hudText);
+        gfx.DrawText(defaultFont,
+                     "WASD mover | Clic/Espacio atacar | Q habilidad | Shift esquivar | "
+                     "Clic der./K defender | 1-9 armas | E usar",
+                     {10, static_cast<float>(gfx.GetScreenHeight() - 22)}, 14, hudText);
+
+        // Inventario, monedas, esquive, jefe, avisos y mensajes.
+        CombatView::Hud hud;
+        hud.player = player;
+        hud.inventory = player ? &inventory : nullptr;
+        hud.mobility = &mobility;
+        hud.prompt = prompt;
+        hud.message = message;
+        // Se desvanece en su ultimo medio segundo en vez de cortarse de golpe.
+        hud.messageAlpha = std::clamp(messageRemaining / 0.5f, 0.0f, 1.0f);
+        hud.text = hudText;
+        // La barra del jefe aparece cuando la pelea empieza: el jugador lo tiene
+        // a la vista o ya lo lastimo. Antes se veia desde el primer frame, con el
+        // jefe todavia encerrado del otro lado del mapa.
+        for (const auto &entity : level.entities)
+        {
+            if (!entity.boss || !Combat::IsActive(entity) || !player)
+            {
+                continue;
+            }
+            const Vector2 bossCenter = Movement::BoxCenter(entity);
+            const float distance = std::hypot(bossCenter.x - player->precisePosition.x,
+                                              bossCenter.y - player->precisePosition.y);
+            if (distance <= Combat::kEnemyAggroRange || entity.health < entity.maxHealth)
+            {
+                hud.boss = &entity;
+                break;
+            }
+        }
+        CombatView::DrawHud(gfx, defaultFont, hud);
+        if (shopNpc && player)
+        {
+            CombatView::DrawShop(gfx, defaultFont, level, *shopNpc, inventory, shopFeedback);
+        }
 
         if (noticeRemaining > 0.0f)
         {
             noticeRemaining = std::max(0.0f, noticeRemaining - deltaTime);
-            gfx.DrawText(defaultFont, notice.c_str(), {10, 40}, 18, MAROON);
+            gfx.DrawText(defaultFont, notice.c_str(), {10, 64}, 18, MAROON);
         }
 
         // --- Pantalla de paso de nivel --------------------------------------
@@ -765,7 +1077,7 @@ int main(int argc, char *argv[])
             {
                 level = loader.Load(transition.target.string(), events);
                 currentLevelPath = transition.target;
-                prepareLevel();
+                prepareLevel(transition.restart ? LevelStart::Restart : LevelStart::Carry);
             }
             catch (const std::exception &error)
             {
@@ -777,7 +1089,6 @@ int main(int argc, char *argv[])
                 noticeRemaining = kNoticeSeconds;
             }
             currentCollisions.clear();
-            swingRemaining = 0.0f;
             transition = Transition{};
         }
     }

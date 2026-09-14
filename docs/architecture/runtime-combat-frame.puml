@@ -1,0 +1,46 @@
+@startuml runtime-combat-frame
+title Runtime - Combate, objetos y puzzles en un frame
+skinparam sequenceMessageAlign center
+
+participant "main.cpp" as main
+participant "InputSystem" as input
+participant "Mobility" as mobility
+participant "Combat" as combat
+participant "Loot" as loot
+participant "EventSystem" as events
+participant "CombatView" as view
+
+main -> input : mouse -> celda apuntada\n(IsoGridSystem::ScreenToGridContinuous)
+
+alt tienda abierta
+  main -> loot : Buy(1..9) / E cierra
+else juego normal
+  main -> input : 1-9 / rueda = arma activa
+  main -> mobility : UpdatePlayer(caminar, Shift esquive, K defensa)
+  mobility --> main : defending, i-frames
+  main -> combat : Update(intent: aim, atacar, Q, defensa, i-frames)
+  activate combat
+  combat -> combat : ataque del arma activa\n(linea / area / reloj / proyectil / area remota / explosivo)
+  combat -> combat : acierto -> contador de habilidad +1\nlleno -> habilidad (auto o Q)
+  combat -> combat : proyectiles y areas pendientes
+  combat -> combat : IA: perseguir, atacar con arma o por contacto
+  combat --> main : caidos, habilidades usadas, jugador vencido
+  deactivate combat
+  main -> loot : RollDrops(caidos)
+  main -> loot : UpdatePickups(E = cambiar arma)\nNearbyShop(E = abrir tienda)
+end
+
+main -> events : Update()
+note right of events
+Triggers: on_zone_cleared, on_boss_defeated,
+on_items_collected, on_player_enter_zone,
+on_ability_used...
+Acciones: show_entity / hide_entity (puertas),
+give_item, add_coins, heal_player,
+set_inventory_slots, show_message...
+end note
+
+main -> view : SubmitGroundItems (ZSort)
+main -> view : DrawEffects, DrawProjectiles
+main -> view : DrawHud (inventario, monedas,\nesquive, jefe, avisos), DrawShop
+@enduml
