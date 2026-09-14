@@ -1100,24 +1100,46 @@
    no tapar el canvas), asi que los botones lo reactivan solo para ellos. */
 .vp-gridpos {
   display: flex;
+  flex-direction: column;
   margin-top: 4px;
   pointer-events: auto;
   width: max-content;
 
   button {
-    padding: 1px 8px;
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 20px;
+    padding: 0;
     border: 0;
     background: rgba(20, 20, 20, 0.6);
     color: rgba(230, 230, 230, 0.7);
-    font: inherit;
-    font-size: 10px;
     cursor: pointer;
 
+    svg {
+      width: 14px;
+      height: 14px;
+      fill: none;
+      stroke: currentColor;
+      stroke-width: 1.3;
+      stroke-linejoin: round;
+      stroke-linecap: round;
+    }
+
+    /* El tachado lleva un borde del color del boton para que se lea como
+       cortando las capas y no como otra linea mas. */
+    .slash {
+      stroke-width: 1.6;
+      paint-order: stroke;
+      filter: drop-shadow(0 0 1px rgba(20, 20, 20, 0.9));
+    }
+
+    /* Apilados en vertical: se redondea arriba el primero y abajo el ultimo. */
     &:first-child {
-      border-radius: var(--radius) 0 0 var(--radius);
+      border-radius: var(--radius) var(--radius) 0 0;
     }
     &:last-child {
-      border-radius: 0 var(--radius) var(--radius) 0;
+      border-radius: 0 0 var(--radius) var(--radius);
     }
     &:hover {
       background: rgba(60, 60, 60, 0.8);

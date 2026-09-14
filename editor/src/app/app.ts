@@ -4349,9 +4349,9 @@ export class App {
     // Lineas de division. Se dibujan como dos familias de rectas completas y no
     // rombo a rombo -- una linea por borde en vez de una por celda, sin trazos
     // repetidos que se ven mas gruesos al superponerse.
-    const gridLines = (color: string) => {
+    const gridLines = (color: string, width = 1) => {
       ctx.strokeStyle = color;
-      ctx.lineWidth = 1;
+      ctx.lineWidth = width;
       ctx.beginPath();
       for (let col = 0; col <= grid.width; col += 1) {
         const from = gridPoint({ col, row: 0 });
@@ -4678,10 +4678,12 @@ export class App {
       }
     }
 
-    // Encima: despues de las entidades y en el mismo rosa que la grilla de F1
-    // del runtime (main.cpp), que tambien va encima de todo.
+    // Encima: despues de las entidades, en azul claro como el acento de Godot.
+    // Opaco y con grosor que crece con el zoom: una linea de 1px se pierde
+    // entre los bordes oscuros del pixel art cuando se acerca la vista, y con
+    // transparencia se mezclaba con el sprite.
     if (this.showGrid() && this.gridOnTop()) {
-      gridLines('rgba(255, 105, 180, 0.86)');
+      gridLines('#70bafa', Math.min(4, Math.max(2, zoom * 0.5)));
     }
 
     this.drawAxisGizmo(ctx, size, iso, grid);

@@ -1027,10 +1027,25 @@
           <!-- Lineas de la grilla por encima de las entidades (como la de F1
                en el runtime) o por debajo, que es como se ve el piso. -->
           <div class="vp-gridpos" role="group" aria-label="Líneas de la grilla">
+            <!-- Tres capas = lineas encima de todo; las mismas capas tachadas =
+                 lineas debajo, sin tapar las entidades. -->
             <button type="button" [class.is-active]="gridOnTop()" (click)="setGridOnTop(true)"
-                    title="Líneas de la grilla encima de las entidades">Encima</button>
+                    title="Líneas de la grilla encima de las entidades" aria-label="Líneas encima">
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M8 2 14 5 8 8 2 5Z" />
+                <path d="M2 8 8 11 14 8" />
+                <path d="M2 11 8 14 14 11" />
+              </svg>
+            </button>
             <button type="button" [class.is-active]="!gridOnTop()" (click)="setGridOnTop(false)"
-                    title="Líneas de la grilla debajo de las entidades">Debajo</button>
+                    title="Líneas de la grilla debajo de las entidades" aria-label="Líneas debajo">
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path d="M8 2 14 5 8 8 2 5Z" />
+                <path d="M2 8 8 11 14 8" />
+                <path d="M2 11 8 14 14 11" />
+                <path class="slash" d="M2.5 14.5 13.5 1.5" />
+              </svg>
+            </button>
           </div>
         </div>
 
