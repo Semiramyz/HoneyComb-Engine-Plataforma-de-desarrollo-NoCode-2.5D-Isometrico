@@ -1,53 +1,49 @@
 {
-  "name": "nuevo_nivel",
-  "grid": {
-    "width": 10,
-    "height": 10,
-    "tileWidth": 64,
-    "tileHeight": 32
-  },
-  "entities": [
-    {
-      "id": "ramp_1",
-      "type": "ramp",
-      "position": {
-        "col": 4,
-        "row": 6
-      },
-      "texture": "textures/shapes.png",
-      "sourceRect": {
-        "x": 132,
-        "y": 0,
-        "width": 64,
-        "height": 96
-      },
-      "groundOffset": 17,
-      "collider": {
-        "width": 64,
-        "height": 32,
-        "solid": true
-      }
-    }
-  ],
-  "events": [],
+  "name": "test_level",
+  "grid": { "width": 10, "height": 10, "tileWidth": 64, "tileHeight": 32 },
   "visuals": {
     "floor": {
       "texture": "textures/floor.png",
-      "sourceRect": {
-        "x": 0,
-        "y": 0,
-        "width": 64,
-        "height": 64
-      }
+      "sourceRect": { "x": 0, "y": 0, "width": 64, "height": 64 }
     },
     "wall": {
       "texture": "textures/wall.png",
-      "sourceRect": {
-        "x": 0,
-        "y": 0,
-        "width": 32,
-        "height": 32
-      }
+      "sourceRect": { "x": 0, "y": 0, "width": 32, "height": 32 }
     }
-  }
+  },
+  "entities": [
+    {
+      "id": "player_1",
+      "type": "player",
+      "position": { "col": 2, "row": 2 },
+      "texture": "textures/player.png",
+      "sourceRect": { "x": 0, "y": 0, "width": 16, "height": 16 },
+      "frames": 2,
+      "frameDuration": 0.4,
+      "scale": 2,
+      "collider": { "width": 16, "height": 16 },
+      "stats": { "health": 100, "damage": 10, "speed": 3 }
+    },
+    {
+      "id": "enemy_1",
+      "type": "enemy",
+      "position": { "col": 7, "row": 7 },
+      "texture": "textures/player2.png",
+      "sourceRect": { "x": 0, "y": 0, "width": 16, "height": 16 },
+      "scale": 2,
+      "collider": { "width": 16, "height": 16 },
+      "stats": { "health": 30, "damage": 10, "speed": 1.5 }
+    }
+  ],
+  "events": [
+    {
+      "trigger": { "type": "on_entity_destroyed", "params": { "entity": "enemy_1" } },
+      "actions": [
+        {
+          "type": "load_level",
+          "params": { "level": "test_level_1.json", "message": "¡Nivel superado!" }
+        }
+      ]
+    }
+  ]
 }

@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('honeycombProject', {
   open: () => ipcRenderer.invoke('project:open'),
 
   openFolder: () => ipcRenderer.invoke('project:openFolder'),
+  // La raiz del proyecto sin pasar por "Abrir carpeta": la deduce, o la pregunta.
+  ensureRoot: () => ipcRenderer.invoke('project:ensureRoot'),
   readFile: (relativePath) => ipcRenderer.invoke('project:readFile', relativePath),
   writeFile: (relativePath, contents) =>
     ipcRenderer.invoke('project:writeFile', { filePath: relativePath, contents }),

@@ -1,17 +1,40 @@
 {
-  "$comment": "Catalogo de bloques disponibles para armar eventos en el editor. Es la lista de piezas del NoCode: el editor genera los formularios del panel de eventos leyendo esto, sin nada hardcodeado, asi que sumar un bloque aca lo hace aparecer en la interfaz sin tocar codigo Angular. Del lado del motor, cada 'type' necesita ademas su implementacion registrada una vez en C++ (RegisterTrigger / RegisterCondition / RegisterAction, ver engine/main.cpp). Un type declarado aca pero no registrado alla simplemente no hace nada: el nivel sigue corriendo.",
+  "$comment": "Catalogo de bloques disponibles para armar eventos en el editor. Es la lista de piezas del NoCode: el editor genera los formularios del panel de eventos leyendo esto, sin nada hardcodeado, asi que sumar un bloque aca lo hace aparecer en la interfaz sin tocar codigo Angular. Del lado del motor, cada 'type' necesita ademas su implementacion registrada una vez en C++ (RegisterTrigger / RegisterCondition / RegisterAction, ver engine/main.cpp). Un type declarado aca pero no registrado alla simplemente no hace nada: el nivel sigue corriendo. Un evento ejecuta sus acciones UNA vez, cuando su trigger y sus condiciones pasan a cumplirse; para repetirse tiene que dejar de cumplirse primero.",
   "triggers": [
     {
       "type": "on_collision",
       "label": "Al colisionar",
-      "description": "Se dispara cuando dos entidades se solapan (CollisionSystem).",
+      "description": "Se dispara cuando dos entidades empiezan a tocarse (CollisionSystem).",
       "params": {
         "entityA": { "type": "entity_ref", "description": "Primera entidad involucrada" },
         "entityB": { "type": "entity_ref", "description": "Segunda entidad involucrada" }
       }
+    },
+    {
+      "type": "on_entity_destroyed",
+      "label": "Al eliminar una entidad",
+      "description": "Se dispara cuando la entidad deja de estar en el nivel: vencida en combate o destruida por un evento.",
+      "params": {
+        "entity": { "type": "entity_ref", "description": "Entidad que tiene que desaparecer" }
+      }
+    },
+    {
+      "type": "on_all_enemies_defeated",
+      "label": "Al vencer a todos los enemigos",
+      "description": "Se dispara cuando no queda ningun enemigo (type 'enemy') en pie. Un nivel sin enemigos no lo dispara nunca.",
+      "params": {}
     }
   ],
-  "conditions": [],
+  "conditions": [
+    {
+      "type": "flag_is_set",
+      "label": "Si la marca está activa",
+      "description": "Se cumple si una accion 'Activar marca' ya activo esa marca en este nivel. Es la pieza de los puzzles: tener la llave, haber pisado la palanca.",
+      "params": {
+        "flag": { "type": "string", "description": "Nombre de la marca, por ejemplo tiene_llave" }
+      }
+    }
+  ],
   "actions": [
     {
       "type": "play_sound",
@@ -27,6 +50,23 @@
       "description": "Elimina una entidad del nivel.",
       "params": {
         "entity": { "type": "entity_ref", "description": "Entidad a destruir" }
+      }
+    },
+    {
+      "type": "set_flag",
+      "label": "Activar marca",
+      "description": "Activa una marca con nombre que despues consulta la condicion 'Si la marca está activa'. Las marcas se borran al cambiar de nivel.",
+      "params": {
+        "flag": { "type": "string", "description": "Nombre de la marca" }
+      }
+    },
+    {
+      "type": "load_level",
+      "label": "Pasar a otro nivel",
+      "description": "Muestra la pantalla de nivel superado con el mensaje y carga otro nivel de la misma carpeta levels/.",
+      "params": {
+        "level": { "type": "level_ref", "description": "Archivo del nivel siguiente" },
+        "message": { "type": "string", "description": "Texto de la pantalla; vacio = ¡Nivel superado!" }
       }
     }
   ]

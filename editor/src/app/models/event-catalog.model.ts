@@ -10,7 +10,9 @@
 // Tipos de parametro que el editor sabe renderizar como control de
 // formulario especifico. Un type no listado aca no rompe nada: el
 // renderizador dinamico cae a un campo de texto simple.
-export type CatalogParamType = 'entity_ref' | 'string' | 'number' | 'boolean';
+// level_ref es el nombre de un archivo de levels/ (para "Pasar a otro nivel"):
+// se elige de una lista, igual que entity_ref, para no escribir uno que no existe.
+export type CatalogParamType = 'entity_ref' | 'level_ref' | 'string' | 'number' | 'boolean';
 
 export interface CatalogParamDef {
   type: CatalogParamType | string;

@@ -137,7 +137,19 @@ LoadedLevel LevelLoader::Load(const std::string& levelPath, EventSystem& eventSy
                 srcJson.at("width").get<float>(), srcJson.at("height").get<float>()
             };
 
-            entity.animationClip = entityJson.value("animation", std::string(""));
+            // Animacion. "frames" manda; sin el, un nivel viejo con
+            // "animation": "player_idle" conserva exactamente lo que tenia
+            // (dos cuadros de 0.4 s), pero ahora medidos desde su propio
+            // recorte y no desde uno fijo de 16x16.
+            if (entityJson.contains("frames")) {
+                int frames = entityJson.value("frames", 1);
+                entity.frames = frames < 1 ? 1 : frames;
+                float frameDuration = entityJson.value("frameDuration", 0.15f);
+                entity.frameDuration = frameDuration > 0.0f ? frameDuration : 0.15f;
+            } else if (entityJson.value("animation", std::string("")) == "player_idle") {
+                entity.frames = 2;
+                entity.frameDuration = 0.4f;
+            }
 
             // Opcional y por defecto 0: los niveles escritos antes de que
             // existiera este campo se siguen dibujando exactamente igual.
@@ -148,6 +160,20 @@ LoadedLevel LevelLoader::Load(const std::string& levelPath, EventSystem& eventSy
             // como 1 en vez de dejar que el sprite se dibuje con tamano cero.
             int span = entityJson.value("span", 1);
             entity.span = span < 1 ? 1 : span;
+
+            float scale = entityJson.value("scale", 1.0f);
+            entity.scale = scale > 0.0f ? scale : 1.0f;
+
+            // Lo que no declara el JSON queda con los valores del struct, que
+            // son los de siempre: un jugador sin "stats" se mueve a 3 celdas/s.
+            if (entityJson.contains("stats")) {
+                const auto& statsJson = entityJson.at("stats");
+                entity.health = statsJson.value("health", entity.health);
+                entity.damage = statsJson.value("damage", entity.damage);
+                entity.speed = statsJson.value("speed", entity.speed);
+            }
+            // La barra de vida se dibuja contra la vida inicial.
+            entity.maxHealth = entity.health > 0.0f ? entity.health : 1.0f;
 
             // Collider opcional. size {0,0} = la entidad no participa de la
             // deteccion; solid=false = participa (dispara on_collision) pero

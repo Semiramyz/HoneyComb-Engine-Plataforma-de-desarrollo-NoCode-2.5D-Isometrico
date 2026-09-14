@@ -42,6 +42,8 @@ export interface HoneycombProjectApi {
 
   /** Abre un dialogo de carpeta y la fija como raiz del proyecto actual. Null si se cancelo. */
   openFolder(): Promise<string | null>;
+  /** La raiz del proyecto: la abierta, la deducida, o la que se elija en un dialogo. Null si se cancelo. */
+  ensureRoot(): Promise<string | null>;
   /** Ruta relativa a la raiz del proyecto abierto. */
   readFile(relativePath: string): Promise<string>;
   writeFile(relativePath: string, contents: string): Promise<void>;

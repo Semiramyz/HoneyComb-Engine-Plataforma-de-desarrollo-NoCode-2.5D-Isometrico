@@ -1,0 +1,136 @@
+{
+  "name": "test_level_1",
+  "grid": { "width": 10, "height": 8, "tileWidth": 64, "tileHeight": 32 },
+  "visuals": {
+    "floor": {
+      "texture": "textures/floor.png",
+      "sourceRect": { "x": 0, "y": 0, "width": 64, "height": 64 }
+    },
+    "wall": {
+      "texture": "textures/wall.png",
+      "sourceRect": { "x": 0, "y": 0, "width": 32, "height": 32 }
+    }
+  },
+  "entities": [
+    {
+      "id": "player_1",
+      "type": "player",
+      "position": { "col": 2, "row": 2 },
+      "texture": "textures/player.png",
+      "sourceRect": { "x": 0, "y": 0, "width": 16, "height": 16 },
+      "frames": 2,
+      "frameDuration": 0.4,
+      "scale": 2,
+      "collider": { "width": 16, "height": 16 },
+      "stats": { "health": 100, "damage": 10, "speed": 3 }
+    },
+    {
+      "id": "llave_1",
+      "type": "item",
+      "position": { "col": 2, "row": 5 },
+      "texture": "textures/player.png",
+      "sourceRect": { "x": 0, "y": 0, "width": 16, "height": 16 },
+      "collider": { "width": 16, "height": 16 }
+    },
+    {
+      "id": "muro_1",
+      "type": "cube",
+      "position": { "col": 5, "row": 1 },
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 0, "y": 0, "width": 64, "height": 96 },
+      "groundOffset": 17,
+      "collider": { "width": 64, "height": 32, "solid": true }
+    },
+    {
+      "id": "muro_2",
+      "type": "cube",
+      "position": { "col": 5, "row": 2 },
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 0, "y": 0, "width": 64, "height": 96 },
+      "groundOffset": 17,
+      "collider": { "width": 64, "height": 32, "solid": true }
+    },
+    {
+      "id": "puerta_1",
+      "type": "pillar",
+      "position": { "col": 5, "row": 3 },
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 198, "y": 98, "width": 64, "height": 96 },
+      "groundOffset": 17,
+      "collider": { "width": 64, "height": 32, "solid": true }
+    },
+    {
+      "id": "muro_3",
+      "type": "cube",
+      "position": { "col": 5, "row": 4 },
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 0, "y": 0, "width": 64, "height": 96 },
+      "groundOffset": 17,
+      "collider": { "width": 64, "height": 32, "solid": true }
+    },
+    {
+      "id": "muro_4",
+      "type": "cube",
+      "position": { "col": 5, "row": 5 },
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 0, "y": 0, "width": 64, "height": 96 },
+      "groundOffset": 17,
+      "collider": { "width": 64, "height": 32, "solid": true }
+    },
+    {
+      "id": "muro_5",
+      "type": "cube",
+      "position": { "col": 5, "row": 6 },
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 0, "y": 0, "width": 64, "height": 96 },
+      "groundOffset": 17,
+      "collider": { "width": 64, "height": 32, "solid": true }
+    },
+    {
+      "id": "cerradura_1",
+      "type": "slab",
+      "position": { "col": 4, "row": 3 },
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 198, "y": 0, "width": 64, "height": 96 },
+      "groundOffset": 17,
+      "collider": { "width": 64, "height": 32 }
+    },
+    {
+      "id": "salida_1",
+      "type": "slab",
+      "position": { "col": 8, "row": 3 },
+      "texture": "textures/shapes.png",
+      "sourceRect": { "x": 198, "y": 0, "width": 64, "height": 96 },
+      "groundOffset": 17,
+      "collider": { "width": 64, "height": 32 }
+    }
+  ],
+  "events": [
+    {
+      "trigger": { "type": "on_collision", "params": { "entityA": "player_1", "entityB": "llave_1" } },
+      "actions": [
+        { "type": "set_flag", "params": { "flag": "tiene_llave" } },
+        { "type": "destroy_entity", "params": { "entity": "llave_1" } }
+      ]
+    },
+    {
+      "trigger": { "type": "on_collision", "params": { "entityA": "player_1", "entityB": "cerradura_1" } },
+      "conditions": [
+        { "type": "flag_is_set", "params": { "flag": "tiene_llave" } }
+      ],
+      "actions": [
+        { "type": "destroy_entity", "params": { "entity": "puerta_1" } },
+        { "type": "destroy_entity", "params": { "entity": "cerradura_1" } }
+      ]
+    },
+    {
+      "trigger": { "type": "on_collision", "params": { "entityA": "player_1", "entityB": "salida_1" } },
+      "actions": [
+        {
+          "type": "load_level",
+          "params": { "level": "test_level.json", "message": "¡Puzzle resuelto!" }
+        }
+      ]
+    }
+  ]
+}

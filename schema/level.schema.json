@@ -85,7 +85,14 @@
               "height": { "type": "number" }
             }
           },
-          "animation": { "type": "string", "description": "Nombre de clip registrado en AnimationSystem. Opcional." },
+          "animation": { "type": "string", "description": "Heredado de los niveles viejos. El motor solo reconoce 'player_idle' (2 cuadros de 0.4 s), y solo si la entidad no declara 'frames'. Para animar, usar 'frames' y 'frameDuration'." },
+          "frames": {
+            "type": "integer",
+            "minimum": 1,
+            "default": 1,
+            "description": "Cuadros de animacion. Van uno al lado del otro en la textura, a partir de 'sourceRect' y del mismo ancho. 1 = el sprite queda quieto. Antes el unico clip estaba escrito en main.cpp con cuadros de 16x16, y eso recortaba a 16x16 a cualquier personaje que lo usara."
+          },
+          "frameDuration": { "type": "number", "exclusiveMinimum": 0, "default": 0.15, "description": "Segundos por cuadro." },
           "groundOffset": {
             "type": "number",
             "default": 0,
@@ -98,6 +105,22 @@
             "default": 1,
             "description": "Celdas por lado que ocupa la entidad, a partir de su position hacia +col y +row: span 3 en la celda 2,2 cubre de 2,2 a 4,4. El motor dibuja el sprite agrandado span veces (el groundOffset tambien) y lo apoya en el centro del bloque. El collider se declara ya del tamano del bloque entero. 1 (o ausente) = una casilla, el comportamiento de siempre."
           },
+          "scale": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "default": 1,
+            "description": "Tamano de dibujo del sprite: 2 = el doble del recorte. Se multiplica con 'span'. No cambia el collider, que se declara aparte en pixeles."
+          },
+          "stats": {
+            "type": "object",
+            "description": "Caracteristicas de combate y movimiento. El motor ya usa 'speed' para mover al jugador; 'health' y 'damage' quedan cargadas para el sistema de combate.",
+            "properties": {
+              "health": { "type": "number", "minimum": 0, "default": 100 },
+              "damage": { "type": "number", "minimum": 0, "default": 0 },
+              "speed": { "type": "number", "minimum": 0, "default": 3, "description": "Celdas de grilla por segundo." }
+            }
+          },
+          "preset": { "type": "string", "description": "Solo del editor: id del personaje configurado (characters.json) del que salio la entidad. Informativo; el motor no lo lee." },
           "collider": {
             "type": "object",
             "description": "Caja de colision en pixeles. Opcional: si falta, la entidad no participa de la deteccion de contactos.",

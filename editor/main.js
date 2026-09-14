@@ -369,19 +369,32 @@ async function sameContents(a, b) {
   return bytesA.equals(bytesB);
 }
 
-ipcMain.handle('project:beginImport', async () => {
+/**
+ * La raiz del proyecto para algo que necesita escribir en el: la ya abierta,
+ * la deducida (ver inferProjectRoot), o -- solo si no hay forma de deducirla --
+ * la que se elija en un dialogo. Null si se cancela ese dialogo.
+ */
+async function ensureProjectRoot(title) {
   if (!currentProjectRoot) {
     currentProjectRoot = inferProjectRoot();
   }
-  // Solo si no se pudo deducir se pregunta, y en el mismo gesto: el dialogo de
-  // la carpeta de imagenes viene justo despues, sin volver a tocar Importar.
   if (!currentProjectRoot) {
-    const project = await dialog.showOpenDialog({
-      title: 'Elegi la carpeta del proyecto (las imagenes van a su assets/textures)',
-      properties: ['openDirectory'],
-    });
+    const project = await dialog.showOpenDialog({ title, properties: ['openDirectory'] });
     if (project.canceled || project.filePaths.length === 0) return null;
     currentProjectRoot = project.filePaths[0];
+  }
+  return currentProjectRoot;
+}
+
+ipcMain.handle('project:ensureRoot', () =>
+  ensureProjectRoot('Elegi la carpeta del proyecto (donde estan levels/ y assets/)'),
+);
+
+ipcMain.handle('project:beginImport', async () => {
+  // Solo si no se pudo deducir se pregunta, y en el mismo gesto: el dialogo de
+  // la carpeta de imagenes viene justo despues, sin volver a tocar Importar.
+  if (!(await ensureProjectRoot('Elegi la carpeta del proyecto (las imagenes van a su assets/textures)'))) {
+    return null;
   }
 
   const { canceled, filePaths } = await dialog.showOpenDialog({

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <functional>
 #include <string>
 #include <unordered_map>
@@ -37,14 +38,23 @@ public:
 
     void LoadEvents(std::vector<EventDefinition> events);
 
-    // Evalua todos los eventos cargados: si el trigger dispara y todas las
-    // condiciones se cumplen, ejecuta las acciones en orden. Un type sin
-    // registrar se ignora (no rompe el nivel).
+    // Evalua todos los eventos cargados. Un evento ejecuta sus acciones UNA
+    // vez, en el frame en que su trigger y todas sus condiciones PASAN a
+    // cumplirse; mientras sigan cumpliendose no vuelve a hacerlo, y para
+    // repetirse tiene que dejar de cumplirse primero. Un type sin registrar se
+    // ignora (no rompe el nivel).
+    //
+    // Las acciones no deben llamar a LoadEvents: reemplazarian la lista que
+    // se esta recorriendo. Pasar de nivel se agenda y se hace fuera de Update.
     void Update();
 
 private:
+    bool IsActive(const EventDefinition& event) const;
+
     std::unordered_map<std::string, TriggerFn> triggers_;
     std::unordered_map<std::string, ConditionFn> conditions_;
     std::unordered_map<std::string, ActionFn> actions_;
     std::vector<EventDefinition> events_;
+    // En paralelo a events_: si cada evento ya se cumplia el frame anterior.
+    std::vector<bool> wasActive_;
 };

@@ -1,6 +1,11 @@
 import { Injectable, signal } from '@angular/core';
 
+import { normalizePreset } from '../core/characters';
 import type { ImportSession, ProjectFileData, ProjectNode } from '../electron-api';
+import { CharacterPreset } from '../models/character-preset.model';
+
+/** Archivo del proyecto con los personajes configurados, junto a levels/ y assets/. */
+export const CHARACTERS_FILE = 'characters.json';
 import { EventCatalog } from '../models/event-catalog.model';
 import { Level } from '../models/level.model';
 
@@ -163,6 +168,50 @@ export class ProjectService {
       JSON.stringify(level, null, 2),
     );
     return result.canceled || !result.filePath ? null : result.filePath;
+  }
+
+  /**
+   * La carpeta del proyecto, deduciendola o preguntandola si nadie abrio una.
+   * Lo usa todo lo que necesita escribir en el proyecto sin haber pasado antes
+   * por "Abrir carpeta" (ver project:ensureRoot en main.js). Null si se cancelo.
+   */
+  async ensureRoot(): Promise<string | null> {
+    const root = await window.honeycombProject.ensureRoot();
+    if (root) {
+      this.projectRoot.set(root);
+    }
+    return root;
+  }
+
+  /**
+   * Personajes configurados del proyecto. Un proyecto que todavia no guardo
+   * ninguno no tiene el archivo, y eso es una lista vacia, no un error. Otro
+   * fallo de lectura SI se informa: tratarlo como vacio haria que el proximo
+   * guardado pise un archivo que solo no se pudo leer.
+   */
+  async readCharacterPresets(): Promise<CharacterPreset[]> {
+    let contents: string;
+    try {
+      contents = await window.honeycombProject.readFile(CHARACTERS_FILE);
+    } catch (error) {
+      if (String(error).includes('ENOENT')) {
+        return [];
+      }
+      throw error;
+    }
+
+    let raw: unknown;
+    try {
+      raw = JSON.parse(contents);
+    } catch {
+      throw new Error(`${CHARACTERS_FILE} no es un JSON valido.`);
+    }
+    const list = (raw as { presets?: unknown } | null)?.presets;
+    return Array.isArray(list) ? list.map((preset) => normalizePreset(preset)) : [];
+  }
+
+  async writeCharacterPresets(presets: CharacterPreset[]): Promise<void> {
+    await window.honeycombProject.writeFile(CHARACTERS_FILE, JSON.stringify({ presets }, null, 2));
   }
 
   async readEventCatalog(): Promise<EventCatalog> {

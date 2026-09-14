@@ -34,6 +34,14 @@ export interface ColliderConfig {
   solid?: boolean;
 }
 
+/** Caracteristicas de combate y movimiento de una entidad. */
+export interface EntityStats {
+  health: number;
+  damage: number;
+  /** Celdas de grilla por segundo. El motor ya la usa para mover al jugador. */
+  speed: number;
+}
+
 export interface LevelEntity {
   /** Identificador unico dentro del nivel; los eventos lo referencian via params de tipo entity_ref. */
   id: string;
@@ -43,8 +51,15 @@ export interface LevelEntity {
   /** Ruta relativa a assets/ (ver AssetResolver del motor). */
   texture: string;
   sourceRect: SourceRect;
-  /** Nombre de clip registrado en AnimationSystem. Ausente si la entidad no se anima. */
+  /**
+   * Heredado: nombre de clip de los niveles viejos. Hoy el motor solo reconoce
+   * "player_idle", y solo si la entidad no declara "frames".
+   */
   animation?: string;
+  /** Cuadros de animacion, uno al lado del otro desde sourceRect. Ausente o 1 = quieto. */
+  frames?: number;
+  /** Segundos por cuadro. */
+  frameDuration?: number;
   /**
    * Pixeles que el sprite baja al dibujarse. Ausente o 0 = el motor apoya el
    * borde inferior del sprite en el punto de la celda (los "pies" de un
@@ -59,6 +74,12 @@ export interface LevelEntity {
    * collider ya viene del tamano del bloque entero.
    */
   span?: number;
+  /** Tamano de dibujo: 2 = el doble del recorte. Ausente = 1. */
+  scale?: number;
+  /** Vida, dano y velocidad. Ausente = los del tipo de la entidad. */
+  stats?: EntityStats;
+  /** Personaje configurado del que salio. Solo informativo: el nivel no depende de characters.json. */
+  preset?: string;
   /** Ausente si la entidad no colisiona. */
   collider?: ColliderConfig;
 }

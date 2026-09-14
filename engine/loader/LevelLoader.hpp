@@ -17,7 +17,10 @@ struct LevelEntity {
     Vector2 precisePosition;
     const Texture2D* texture;
     Rectangle sourceRect;
-    std::string animationClip;  // vacio si la entidad no se anima
+    // Animacion: "frames" cuadros uno al lado del otro desde sourceRect, del
+    // mismo ancho. 1 = quieto. Reemplaza al clip unico escrito en main.cpp.
+    int frames = 1;
+    float frameDuration = 0.15f;
     // Pixeles que el sprite baja al dibujarse. 0 = el borde de abajo del
     // sprite va en el punto de la celda (los "pies" de un personaje). Un
     // solido que llena la casilla usa este campo para apoyar el centro del
@@ -27,6 +30,18 @@ struct LevelEntity {
     // se agranda span veces y se apoya en el centro del bloque; el collider
     // ya viene del tamano del bloque entero. 1 = una casilla.
     int span = 1;
+    // Tamano de dibujo del sprite (2 = el doble del recorte). Se multiplica
+    // con span; el collider no cambia, se declara aparte en pixeles.
+    float scale = 1.0f;
+    // Caracteristicas ("stats" en el JSON). speed ya mueve al jugador; health y
+    // damage quedan cargadas para el sistema de combate.
+    float health = 100.0f;
+    float damage = 0.0f;
+    float speed = 3.0f;  // celdas de grilla por segundo
+    // Estado de combate EN EJECUCION: no viene del JSON, lo lleva Combat.
+    float maxHealth = 100.0f;  // la vida con la que arranco, para la barra
+    float attackTimer = 0.0f;  // segundos hasta poder volver a pegar
+    float hurtTimer = 0.0f;    // segundos de destello rojo por un golpe recibido
     Vector2 colliderSize;        // {0,0} si la entidad no colisiona
     bool colliderSolid = false;  // true si el collider bloquea el movimiento
     bool destroyed = false;      // borrado suave: la accion destroy_entity solo marca esto

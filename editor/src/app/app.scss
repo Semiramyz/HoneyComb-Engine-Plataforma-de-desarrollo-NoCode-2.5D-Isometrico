@@ -655,6 +655,234 @@
   cursor: grabbing;
 }
 
+/* ---------- Dialogos anchos ---------- */
+/* El de grilla y el de tunel tienen varios campos por fila (los cuatro lados,
+   columna/fila/ancho/alto): en 400px se apilaban y el dialogo quedaba mas alto
+   que la ventana. Mas ancho, entran en pocas filas. */
+/* Con DOS clases a proposito: .modal declara su ancho de 400px mas abajo en
+   este archivo, y con una sola clase empataba en especificidad y ganaba por
+   venir despues. Por eso estos dialogos nunca llegaron a ensancharse. */
+.modal.modal--wide {
+  width: min(640px, calc(100vw - 40px));
+}
+
+.modal.modal--xl {
+  width: min(960px, calc(100vw - 40px));
+}
+
+.modal--wide,
+.modal--xl {
+  .field-row > .field {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+/* ---------- Configurar personajes ---------- */
+.chareditor {
+  display: grid;
+  grid-template-columns: 210px 1fr;
+  border-top: 1px solid var(--border-soft);
+  border-bottom: 1px solid var(--border-soft);
+
+  /* Cada columna se desplaza por su cuenta: la lista puede crecer mucho sin
+     llevarse el formulario hacia abajo. */
+  &__list,
+  &__form {
+    max-height: 64vh;
+    overflow: auto;
+  }
+
+  &__list {
+    padding: 6px 0;
+    border-right: 1px solid var(--border-soft);
+    background: var(--bg-header);
+  }
+
+  &__group {
+    padding-bottom: 6px;
+  }
+
+  &__grouphead {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 8px;
+    color: var(--text-dim);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  &__empty {
+    margin: 0;
+    padding: 2px 12px;
+    color: var(--text-dim);
+    font-size: 11px;
+    font-style: italic;
+  }
+
+  &__form {
+    padding: 10px 12px;
+  }
+
+  &__section {
+    margin: 14px 0 4px;
+    color: var(--text-dim);
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  &__asset {
+    display: grid;
+    grid-template-columns: 112px 1fr;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  /* Tablero de transparencia detras del sprite, como en Recursos. */
+  &__preview {
+    display: grid;
+    place-items: center;
+    height: 112px;
+    border-radius: var(--radius);
+    background-image:
+      linear-gradient(45deg, #4a4a4a 25%, transparent 25%),
+      linear-gradient(-45deg, #4a4a4a 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, #4a4a4a 75%),
+      linear-gradient(-45deg, transparent 75%, #4a4a4a 75%);
+    background-color: #2e2e2e;
+    background-size: 12px 12px;
+    background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+  }
+
+  &__sprite {
+    display: block;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+  }
+
+  &__nopreview {
+    color: var(--text-dim);
+    font-size: 10px;
+  }
+
+  /* Los dos numeros, la casilla y el boton en una sola fila, alineados abajo
+     con los campos. */
+  &__collider {
+    align-items: flex-end;
+  }
+}
+
+/* Selector de asset: las texturas del proyecto como miniaturas. */
+.texpicker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+  align-content: start;
+  gap: 3px;
+  max-height: 112px;
+  overflow: auto;
+
+  /* El aviso de "sin texturas" ocupa todo el ancho: como una celda mas de la
+     grilla de 40px se partia en una palabra por renglon. */
+  .hint {
+    grid-column: 1 / -1;
+    margin: 0;
+  }
+
+  &__item {
+    display: grid;
+    place-items: center;
+    height: 40px;
+    padding: 2px;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    background: var(--bg-panel);
+    cursor: pointer;
+
+    img {
+      max-width: 100%;
+      max-height: 100%;
+      image-rendering: pixelated;
+    }
+
+    &:hover {
+      background: #444;
+    }
+    &.is-active {
+      border-color: var(--accent-hi);
+      background: #3f4a5e;
+    }
+  }
+}
+
+/* ---------- Paleta: personajes configurados de un tipo ---------- */
+.presetlist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 6px 6px;
+
+  &__item {
+    display: grid;
+    grid-template-columns: 26px 1fr auto;
+    align-items: center;
+    gap: 6px;
+    height: 30px;
+    padding: 0 6px;
+    border: 1px solid transparent;
+    border-radius: var(--radius);
+    background: var(--bg-panel);
+    color: var(--text);
+    font: inherit;
+    text-align: left;
+    /* "grab": el gesto principal es arrastrarlo a la grilla. */
+    cursor: grab;
+
+    &:hover {
+      background: #444;
+    }
+    &.is-active {
+      border-color: var(--accent-hi);
+      background: #3f4a5e;
+    }
+  }
+
+  &__thumb {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    overflow: hidden;
+    border-radius: 3px;
+  }
+
+  &__sprite {
+    display: block;
+    background-repeat: no-repeat;
+    image-rendering: pixelated;
+    pointer-events: none;
+  }
+
+  &__name {
+    overflow: hidden;
+    font-size: 11px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__stats {
+    color: var(--text-dim);
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  &__new {
+    margin-top: 2px;
+  }
+}
+
 /* Grupo de botones que puede bajar de linea (los cuatro lados de una grilla
    en un dialogo angosto). Separados y todos redondeados: pegados en varias
    filas, las esquinas de .seg dejarian formas raras. */
@@ -1184,6 +1412,25 @@
   }
 }
 
+/* Un control que no es un solo valor -- una fila de botones, o un texto con
+   botones debajo --: etiqueta arriba y contenido abajo. Adentro de la pastilla
+   de 20px de .field quedaba aplastado y cortado, que es lo que pasaba con "De
+   que lado" y "Trazado". */
+.fieldblock {
+  margin-bottom: 6px;
+
+  &__label {
+    display: block;
+    margin-bottom: 3px;
+    color: var(--text-dim);
+    font-size: 10px;
+  }
+
+  .hint {
+    margin: 0 0 4px;
+  }
+}
+
 /* ---------- Dialogo de nivel nuevo ---------- */
 /* Fondo oscurecido del dialogo. "inset: 0" lo estira sobre toda la ventana y
    "place-items: center" centra el dialogo sin cuentas. Ademas de oscurecer,
@@ -1203,10 +1450,16 @@
    son lo unico que flota sobre la interfaz. */
 .modal {
   width: min(400px, 100%);
+  /* Nunca mas alto que la ventana: un dialogo con muchos campos se desplaza
+     por dentro en vez de dejar los botones de abajo fuera de la pantalla. */
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
   border-radius: 6px;
   background: var(--bg-editor);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
-  overflow: hidden;
+  /* Sin "overflow: hidden" aca: pisaba el overflow-y de arriba y un dialogo
+     alto quedaba recortado en vez de desplazarse. El auto ya recorta las
+     esquinas redondeadas igual. */
 
   &__head {
     display: flex;
